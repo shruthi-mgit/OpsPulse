@@ -109,36 +109,42 @@ class SAPApiClient:
 
     @staticmethod
     async def get_gl_all(config):
-        return await SAPApiClient.get_all_data(
-            "ChartOfAccounts?$select=Code,Name,ActiveAccount", config
+        query = (
+            "ChartOfAccounts"
+            "?$select=Code,Name,ActiveAccount,Balance"
+            "&$filter=ActiveAccount eq 'tYES'"
         )
+        return await SAPApiClient.get_all_data(query, config)
 
     @staticmethod
     async def get_bp_all(config):
-        return await SAPApiClient.get_all_data(
+        query = (
             "BusinessPartners?"
-            "$select=CardCode,CardName,CardType,ZipCode,Country,EmailAddress,City,BPAddresses"
-            "&$filter=CardType eq 'cCustomer' or CardType eq 'cSupplier'",
-            config
+            "$select=CardCode,CardName,CardType,City,Country,CurrentAccountBalance"
+            "&$filter=(CardType eq 'cCustomer' or CardType eq 'cSupplier')"
+            "&$orderby=CardName"
         )
+        return await SAPApiClient.get_all_data(query, config)
 
     @staticmethod
     async def get_bp_customers(config):
-        return await SAPApiClient.get_all_data(
+        query = (
             "BusinessPartners?"
-            "$select=CardCode,CardName,CardType,ZipCode,Country,EmailAddress,City,BPAddresses"
-            "&$filter=CardType eq 'cCustomer'",
-            config
+            "$select=CardCode,CardName,CardType,City,Country,CurrentAccountBalance"
+            "&$filter=CardType eq 'cCustomer'"
+            "&$orderby=CardName"
         )
+        return await SAPApiClient.get_all_data(query, config)
 
     @staticmethod
     async def get_bp_suppliers(config):
-        return await SAPApiClient.get_all_data(
+        query = (
             "BusinessPartners?"
-            "$select=CardCode,CardName,CardType"
-            "&$filter=CardType eq 'cSupplier'",
-            config
+            "$select=CardCode,CardName,CardType,ZipCode,Country,EmailAddress,City,CurrentAccountBalance"
+            "&$filter=CardType eq 'cSupplier'"
+            "&$orderby=CardName"
         )
+        return await SAPApiClient.get_all_data(query, config)
 
     # =========================
     # CUSTOMER APIs

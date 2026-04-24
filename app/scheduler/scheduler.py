@@ -1,3 +1,4 @@
+import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.scheduler.log_service import LogService
@@ -7,7 +8,9 @@ from app.Integration.sap_api_client import SAPApiClient
 from app.config.config_service import get_sap_config
 
 
+
 scheduler = AsyncIOScheduler()
+
 
 
 # ===================================
@@ -33,12 +36,12 @@ async def sync_one_tenant(conn, schema_id):
         # 🔐 Login once per tenant
         config = await get_sap_config(conn)
         await SAPApiClient.login(config)
+
         # ========================
         # BRANCH
         # ========================
         try:
             branches = await SAPApiClient.get_branches_all(config)
-
             for b in branches:
                 await SapMasterService.save_branch(conn, schema, b)
 
@@ -52,7 +55,6 @@ async def sync_one_tenant(conn, schema_id):
         # ========================
         try:
             banks = await SAPApiClient.get_banks_all(config)
-
             for b in banks:
                 await SapMasterService.save_bank(conn, schema, b)
 
@@ -66,7 +68,6 @@ async def sync_one_tenant(conn, schema_id):
         # ========================
         try:
             gl_accounts = await SAPApiClient.get_gl_all(config)
-
             for g in gl_accounts:
                 await SapMasterService.save_glaccount(conn, schema, g)
 
@@ -76,11 +77,10 @@ async def sync_one_tenant(conn, schema_id):
             await log.log_error(schema, schema_id, "GLAccounts", str(e))
 
         # ========================
-        # BUSINESS PARTNERS (FULL SYNC)
+        # BUSINESS PARTNER
         # ========================
         try:
-            bp_data = await SAPApiClient.get_bp_all(config)  
-
+            bp_data = await SAPApiClient.get_bp_all(config)
             for bp in bp_data:
                 await SapBPService.save_bp(conn, schema, bp)
 
@@ -90,23 +90,32 @@ async def sync_one_tenant(conn, schema_id):
             await log.log_error(schema, schema_id, "BusinessPartner", str(e))
 
     except Exception as e:
-        # global failure
-        await log.log_error(schema, schema_id, "ERROR", str(e))
+        await log.log_error(schema, schema_id, "GLOBAL_ERROR", str(e))
 
 
 # ===================================
-# MAIN SYNC
+# MAIN SYNC (PARALLEL)
 # ===================================
 async def sync_sap_data(db_pool):
 
     async with db_pool.acquire() as conn:
-
         tenants = await get_tenants(conn)
 
-        for t in tenants:
-            schema_id = t["schema_id"]
-
+    async def run_for_tenant(schema_id):
+        async with db_pool.acquire() as conn:
             await sync_one_tenant(conn, schema_id)
+
+    await asyncio.gather(
+        *[run_for_tenant(t["schema_id"]) for t in tenants]
+    )
+
+
+# ===================================
+# TRIGGER FOR SINGLE TENANT (ONBOARD)
+# ===================================
+async def trigger_single_tenant_sync(db_pool, schema_id):
+    async with db_pool.acquire() as conn:
+        await sync_one_tenant(conn, schema_id)
 
 
 # ===================================
@@ -116,12 +125,15 @@ def start_scheduler(db_pool):
 
     scheduler.add_job(
         sync_sap_data,
-        "interval",
-        minutes=3,        
+        "cron",
+        hour=2,
+        minute=0,
         args=[db_pool],
-        max_instances=3,  # prevent parallel runs
+        id="sap_sync_job",
+        replace_existing=True,
+        max_instances=3,
         coalesce=True,
-        misfire_grace_time=60
+        misfire_grace_time=300
     )
 
     scheduler.start()

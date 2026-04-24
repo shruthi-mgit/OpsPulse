@@ -68,7 +68,7 @@ class LogRepository:
             """,
             error_id,
             schema_id,
-            datetime.utcnow().date(),
+            datetime.utcnow(),
             type,
             error_desc,
         )
@@ -102,8 +102,8 @@ class LogRepository:
             """,
             success_id,
             schema_id,
-            datetime.utcnow().date(),
+            datetime.utcnow(),
             type,
-            datetime.utcnow().date(),
+            datetime.utcnow(),
             success_desc,
         )

@@ -84,6 +84,7 @@ class SapBPService:
             # PAN (fallback)
             # =========================
             pan = data.get("FederalTaxID")
+            balance = data.get("CurrentAccountBalance", 0)
 
             # =========================
             # INSERT / UPDATE
@@ -104,10 +105,11 @@ class SapBPService:
                     mobile_number,
                     is_active,
                     gst_number,
-                    pan_number
+                    pan_number,
+                    balance
                 )
                 VALUES
-                ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE,$11,$12)
+                ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE,$11,$12,$13)
 
                 ON CONFLICT (bp_id)
                 DO UPDATE SET
@@ -122,6 +124,7 @@ class SapBPService:
                     mobile_number = EXCLUDED.mobile_number,
                     gst_number = EXCLUDED.gst_number,
                     pan_number = EXCLUDED.pan_number,
+                    balance = EXCLUDED.balance,   -- ✅ IMPORTANT
                     is_active = TRUE
                 """,
                 bp_id,
@@ -136,8 +139,8 @@ class SapBPService:
                 mobile,
                 gst,
                 pan,
+                balance   # ✅ NEW PARAM
             )
-
             #logger.info(f"✅ BP saved: {bp_id}")
 
         except Exception as e:

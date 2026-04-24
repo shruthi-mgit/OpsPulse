@@ -44,6 +44,7 @@ class UpdateOnboardingRequest(BaseModel):
     company_gst: Optional[str] = None
     registration_number: Optional[str] = None
     user_name: Optional[str] = None
+    email: Optional[EmailStr] = None
     user_phone_no: Optional[str] = None
     email_id: Optional[str] = None
     email_pwd: Optional[str] = None

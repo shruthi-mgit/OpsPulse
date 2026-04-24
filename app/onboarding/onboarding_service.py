@@ -19,7 +19,7 @@ from app.onboarding.onboarding_email_service import send_activation_email
 from app.onboarding.onboarding_repository import OnboardingRepository
 from datetime import datetime
 import base64
-
+from app.scheduler.scheduler import trigger_single_tenant_sync
 
 
 GLOBAL_SCHEMA = "ik_payops_b1"
@@ -74,6 +74,24 @@ class OnboardingService:
                 if exists:
                     raise HTTPException(400, "Email already exists")
 
+                
+                # -------------------------
+                # Company Name Validation
+                # -------------------------
+
+                company_name = " ".join(data.company_name.strip().split())
+
+                exact_match = await conn.fetchrow("""
+                    SELECT company_name
+                    FROM ik_payops_b1.ik_onboarding_company
+                    WHERE LOWER(TRIM(company_name)) = LOWER(TRIM($1))
+                """, company_name)
+
+                if exact_match:
+                    raise HTTPException(400, "Company name already exists")
+
+                
+
                 # -------------------------
                 # Generate onboarding id
                 # -------------------------
@@ -85,6 +103,7 @@ class OnboardingService:
                 # -------------------------
                 # Insert onboarding
                 # -------------------------
+                data.company_name = company_name
 
                 await OnboardingRepository.insert_onboarding_company(
                     conn,
@@ -216,6 +235,7 @@ class OnboardingService:
                         created_by,
                         onboard_company_id
                     )
+                    
                     tenant_admin_credentials = {
                         "username": email,
                         "password": default_password,
@@ -229,6 +249,14 @@ class OnboardingService:
                         email,
                         default_password,
                     )
+
+                if tenant_schema:
+                    background_tasks.add_task(
+                        trigger_single_tenant_sync,
+                        db_pool,
+                        tenant_schema
+                    )
+
 
         return {
             "message": "Company onboarding completed",
@@ -431,6 +459,12 @@ class OnboardingService:
                     tenant_schema,
                     company["email"],
                     default_password
+                )
+            if tenant_schema:
+                background_tasks.add_task(
+                    trigger_single_tenant_sync,
+                    db_pool,
+                    tenant_schema
                 )
 
         return {

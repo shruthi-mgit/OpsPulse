@@ -10,7 +10,6 @@ class CreateTenantUserRequest(BaseModel):
     email: EmailStr
     role: str
     mobile_number: str
-    password: str  
     branch: str | None = None
     branch_id: str | None = None
 # ==================================================

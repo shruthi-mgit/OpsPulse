@@ -38,6 +38,7 @@ python -m PyInstaller `
 --onedir `
 --clean `
 --noconfirm `
+--add-data "app/static;static" `
 app\main.py
 
 Write-Host "===== BUILD DONE =====" -ForegroundColor Cyan

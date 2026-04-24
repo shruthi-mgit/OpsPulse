@@ -28,6 +28,40 @@ async def generate_id(conn, tenant_schema, seq_name, prefix):
 
     return f"{prefix}_{str(seq).zfill(14)}"
 
+async def generate_error_id(conn, tenant_schema):
+    last_id = await conn.fetchval(f'''
+        SELECT error_id FROM "{tenant_schema}".ik_error
+        ORDER BY error_id DESC
+        LIMIT 1
+    ''')
+
+    if last_id:
+        num = int(last_id.split("_")[1]) + 1
+    else:
+        num = 1
+
+    return f"ERROR_{str(num).zfill(14)}"
+
+async def log_error(conn, tenant_schema, module, operation, ref_id, error_msg, payload):
+    try:
+        error_id = await generate_error_id(conn, tenant_schema)
+
+        await conn.execute(f"""
+            INSERT INTO "{tenant_schema}".ik_error
+            (error_id, schema_id, module, operation, ref_id, error_desc, payload)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
+        """,
+            error_id,
+            tenant_schema,
+            module,
+            operation,
+            ref_id,
+            error_msg,
+            payload
+        )
+    except Exception as log_ex:
+        logger.error(f"Failed to log error: {str(log_ex)}")
+
 class SapPaymentService:
 
     # =========================
@@ -39,7 +73,11 @@ class SapPaymentService:
             query = f"""
                 SELECT 
                     bp_id AS customer_code,
-                    bp_name AS customer_name
+                    bp_name AS customer_name,
+                    city,
+                    country,
+                    email,
+                    balance
                 FROM "{tenant_schema}".ik_bp
                 WHERE bp_type = 'C'
             """
@@ -59,7 +97,11 @@ class SapPaymentService:
             data = [
                 {
                     "customer_code": r["customer_code"],
-                    "customer_name": r["customer_name"]
+                    "customer_name": r["customer_name"],
+                    "city": r.get("city"),
+                    "country": r.get("country"),
+                    "email": r.get("email"),
+                    "balance": r.get("balance")
                 }
                 for r in rows
             ]
@@ -117,7 +159,9 @@ class SapPaymentService:
             query = f"""
                 SELECT 
                     account_id AS account_code,
-                    account_name
+                    account_name,
+                    is_active,
+                    balance
                 FROM "{tenant_schema}".ik_glaccount
                 WHERE is_active = TRUE
             """
@@ -137,7 +181,9 @@ class SapPaymentService:
             data = [
                 {
                     "account_code": r["account_code"],
-                    "account_name": r["account_name"]
+                    "account_name": r["account_name"],
+                    "is_active": r["is_active"],
+                    "balance": r["balance"]
                 }
                 for r in rows
             ]
@@ -203,7 +249,11 @@ class SapPaymentService:
             query = f"""
                 SELECT 
                     bp_id AS supplier_code,
-                    bp_name AS supplier_name
+                    bp_name AS supplier_name,
+                    city,
+                    country,
+                    email,
+                    balance
                 FROM "{tenant_schema}".ik_bp
                 WHERE bp_type = 'S'
             """
@@ -212,7 +262,7 @@ class SapPaymentService:
             param_index = 1
 
             if search:
-                query += f" AND LOWER(bp_name) LIKE LOWER(${param_index})"
+                query += f" AND bp_name ILIKE ${param_index}"
                 values.append(f"%{search}%")
                 param_index += 1
 
@@ -223,7 +273,11 @@ class SapPaymentService:
             data = [
                 {
                     "supplier_code": r["supplier_code"],
-                    "supplier_name": r["supplier_name"]
+                    "supplier_name": r["supplier_name"],
+                    "city": r.get("city"),
+                    "country": r.get("country"),
+                    "email": r.get("email"),
+                    "balance": r.get("balance")
                 }
                 for r in rows
             ]
@@ -236,7 +290,6 @@ class SapPaymentService:
                 status_code=500,
                 detail={"status": "error", "message": "Failed to fetch suppliers"}
             )
-
     # =========================
     # SUPPLIER INVOICES
     # =========================
@@ -278,36 +331,69 @@ class SapPaymentService:
     @staticmethod
     async def get_branches(conn, tenant_schema: str, search: str = ""):
         try:
-            from app.config.config_service import get_sap_config
+            query = f"""
+                SELECT branch_id, branch_name
+                FROM {tenant_schema}.ik_branch
+                WHERE is_active = true
+            """
 
-            config = await get_sap_config(conn)
-
-            data = await SAPApiClient.get_branches_all(config)
+            params = []
 
             if search:
-                data = [
-                    b for b in data
-                    if search.lower() in (b.get("Name") or "").lower()
-                ]
+                query += " AND LOWER(branch_name) LIKE LOWER($1)"
+                params.append(f"%{search}%")
+
+            rows = await conn.fetch(query, *params)
 
             formatted = [
                 {
-                    "branch_code": b.get("Code"),
-                    "branch_name": b.get("Name"),
+                    "branch_code": row["branch_id"],   # keep as string
+                    "branch_name": row["branch_name"],
                 }
-                for b in (data or [])
+                for row in rows
             ]
 
             return success_response(formatted)
 
         except Exception:
-            logger.exception("Error fetching branches")
+            logger.exception("Error fetching branches from DB")
             raise HTTPException(
                 status_code=500,
                 detail={"status": "error", "message": "Failed to fetch branches"}
             )
-
     
+    @staticmethod
+    def get_check_account(bank_code, bank_name, gl_accounts):
+
+        # ✅ PRIORITY 1: Use BankCode (BEST MATCH)
+        if bank_code:
+            bank_code = bank_code.lower()
+
+            for acc in gl_accounts:
+                acc_name = acc["account_name"].lower()
+
+                # Example: SBIN → match "state bank of india"
+                if bank_code in acc_name:
+                    return acc["account_code"]
+
+                # Example: DEUT0019 → match last 4 digits (0019)
+                if len(bank_code) >= 4:
+                    suffix = bank_code[-4:]
+                    if suffix in acc_name:
+                        return acc["account_code"]
+
+        # ✅ PRIORITY 2: fallback to BankName
+        if bank_name:
+            bank_name_lower = bank_name.lower()
+
+            for acc in gl_accounts:
+                if bank_name_lower in acc["account_name"].lower():
+                    return acc["account_code"]
+
+        return None
+
+
+
     @staticmethod
     async def create_incoming_payment(request, data, db_pool, current_user):
 
@@ -331,12 +417,14 @@ class SapPaymentService:
 
                 payment_date = datetime.strptime(payment_date_str, "%Y-%m-%d").date()
 
-                remarks = data.get("remarks", "")
-                final_remarks = (
-                    f"{remarks} | Payment Date: {payment_date_str}"
-                    if remarks else f"Payment Date: {payment_date_str}"
-                )
+                user_remark = (data.get("remarks") or "").strip()
 
+                system_remark = "Posted from PayOpsB1"
+
+                final_remarks = system_remark
+
+                if user_remark:
+                    final_remarks += f" - {user_remark}"
                 # -------------------------
                 # VALIDATION
                 # -------------------------
@@ -549,15 +637,24 @@ class SapPaymentService:
                     if payments.get("transfer"):
                         bank_account = to_str(payments["transfer"].get("account_id"))
                         bank_amount = float(payments["transfer"].get("amount", 0))
-                        transfer_date = payment_date if isinstance(payment_date, date) else None   # ✅ FIX
+                        transfer_date = payment_date if isinstance(payment_date, date) else None   
 
                     if payments.get("checks"):
                         chk = payments["checks"][0]
                         cheque_no = to_str(chk.get("CheckNumber"))
                         cheque_amount = float(chk.get("CheckSum", 0))
-                        cheque_duedate = payment_date if isinstance(payment_date, date) else None  # ✅ FIX
-                        bank_name = to_str(chk.get("BankCode"))            # ✅ FIX
-                        cheque_account = to_str(chk.get("CheckAccount"))   # ✅ FIX
+                        cheque_duedate = payment_date if isinstance(payment_date, date) else None  
+                        bank_name = to_str(
+                            chk.get("BankName") or 
+                            chk.get("bank_name") or
+                            chk.get("banks") or 
+                            chk.get("bank") or
+                            chk.get("bank_code") or
+                            chk.get("bankName") or
+                            chk.get("BankCode") or 
+                            "bankname"
+                        )          
+                        cheque_account = to_str(chk.get("CheckAccount"))  
 
                     await conn.execute(f'''
                         INSERT INTO "{tenant_schema}".ik_inc_payment_paymeans_line
@@ -602,15 +699,44 @@ class SapPaymentService:
                 if payments.get("checks"):
                     check = payments["checks"][0]
 
-                    sap_payload["CheckAccount"] = 11430001
+                    gl_rows = await conn.fetch(f'''
+                        SELECT account_id AS account_code, account_name
+                        FROM "{tenant_schema}".ik_glaccount
+                        WHERE is_active = TRUE
+                    ''')
+
+                    gl_accounts = [dict(r) for r in gl_rows]
+
+                    bank_code = (
+                        check.get("BankCode") or
+                        check.get("bank_code") or
+                        check.get("bankCode")
+                    )
+
+                    bank_name = (
+                        check.get("BankName") or
+                        check.get("bank_name") or
+                        check.get("bankName")
+                    )
+
+                    check_account = SapPaymentService.get_check_account(
+                        bank_code,
+                        bank_name,
+                        gl_accounts
+                    )
+
+                    if not check_account:
+                        raise HTTPException(400, f"No GL account mapped for bank: {check.get('BankName')}")
+
+                    sap_payload["CheckAccount"] = check_account
 
                     sap_payload["PaymentChecks"] = [{
                         "DueDate": payment_date_str,
                         "CheckNumber": check["CheckNumber"],
-                        "BankCode": check.get("BankCode", ""),
+                        "BankCode": check.get("BankCode"),
                         "CheckSum": float(check["CheckSum"]),
                         "CountryCode": check.get("CountryCode", "IN"),
-                        "CheckAccount": check.get("CheckAccount")
+                        "CheckAccount": check_account
                     }]
 
                 # -------------------------
@@ -650,11 +776,22 @@ class SapPaymentService:
                         WHERE payment_id=$1
                     ''', payment_id)
 
+                    # ✅ LOG ERROR
+                    await log_error(
+                        conn,
+                        tenant_schema,
+                        module="INCOMING_PAYMENT",
+                        operation="SAP_POST",
+                        ref_id=payment_id,
+                        error_msg=str(e),
+                        payload=sap_payload
+                    )
+
                     return {
                         "status": "error",
                         "error": str(e),
                         "payment_id": payment_id,
-                        "sap_payload": sap_payload, 
+                        "sap_payload": sap_payload,
                         "sap_response": str(e)
                     }
 
@@ -817,12 +954,21 @@ class SapPaymentService:
                 # -------------------------
                 payment_date = data.get("payment_date")
 
+                user_remark = (data.get("remarks") or "").strip()
+
+                system_remark = "Auto generated by Payops-B1"
+
+                final_remarks = system_remark
+
+                if user_remark:
+                    final_remarks += f" - {user_remark}"
+
                 sap_payload = {
                     "DocType": "rSupplier" if payment_type == "Vendor" else "rAccount",
                     "DocDate": payment_date,
                     "TaxDate": payment_date,
                     "DueDate": payment_date,
-                    "Remarks": data.get("remarks")
+                    "Remarks": final_remarks 
                 }
 
 
@@ -873,7 +1019,16 @@ class SapPaymentService:
                         cheque_no = to_str(chk.get("CheckNumber"))
                         cheque_amount = float(chk.get("CheckSum", 0))
                         cheque_duedate = to_date(payment_date)  
-                        bank_name = to_str(chk.get("BankCode"))        # 🔥 IMPORTANT FIX
+                        bank_name = to_str(
+                            chk.get("BankName") or 
+                            chk.get("bank_name") or
+                            chk.get("banks") or 
+                            chk.get("bank") or
+                            chk.get("bank_code") or
+                            chk.get("bankName") or
+                            chk.get("BankCode") or 
+                            "bank_name"
+                        )      
                         cheque_account = to_str(chk.get("CheckAccount"))
 
                     await conn.execute(f'''
@@ -921,18 +1076,46 @@ class SapPaymentService:
                 if payments.get("checks"):
                     check = payments["checks"][0]
 
-                    #sap_payload["CheckAccount"] = check.get("CheckAccount")
-                    sap_payload["CheckAccount"] = 11430001
+                    # fetch GL accounts
+                    gl_rows = await conn.fetch(f'''
+                        SELECT account_id AS account_code, account_name
+                        FROM "{tenant_schema}".ik_glaccount
+                        WHERE is_active = TRUE
+                    ''')
+                    gl_accounts = [dict(r) for r in gl_rows]
+
+                    # get mapped GL account
+                    bank_code = (
+                        check.get("BankCode") or
+                        check.get("bank_code") or
+                        check.get("bankCode")
+                    )
+
+                    bank_name = (
+                        check.get("BankName") or
+                        check.get("bank_name") or
+                        check.get("bankName")
+                    )
+
+                    check_account = SapPaymentService.get_check_account(
+                        bank_code,
+                        bank_name,
+                        gl_accounts
+                    )
+
+                    if not check_account:
+                        raise HTTPException(400, f"No GL account mapped for bank: {check.get('BankName')}")
+
+                    sap_payload["CheckAccount"] = check_account
 
                     sap_payload["PaymentChecks"] = [{
                         "DueDate": payment_date,
                         "CheckNumber": check["CheckNumber"],
-                        "BankCode": check.get("BankCode", ""),
+                        "BankCode": check.get("BankCode"),
                         "CheckSum": float(check["CheckSum"]),
                         "CountryCode": check.get("CountryCode", "IN"),
-                        "CheckAccount": check.get("CheckAccount")
+                        "CheckAccount": check_account
                     }]
-
                 # CARD (SAFE VERSION)
                 if payments.get("card"):
                     card = payments["card"][0]
@@ -988,7 +1171,7 @@ class SapPaymentService:
                 # -------------------------
                 config = await get_sap_config(conn)
 
-                print("SAP REQUEST:", sap_payload)
+                #print("SAP REQUEST:", sap_payload)
 
                 try:
                     sap_res = await SAPApiClient.post_outgoing_payment(config, sap_payload)
@@ -1016,10 +1199,21 @@ class SapPaymentService:
 
                     await conn.execute(f'''
                         UPDATE "{tenant_schema}".ik_out_payment_header
-                        SET status='close',
+                        SET status='Failed',
                             updated_at=NOW()
                         WHERE payment_id=$1
                     ''', payment_id)
+
+                    # ✅ LOG ERROR
+                    await log_error(
+                        conn,
+                        tenant_schema,
+                        module="OUTGOING_PAYMENT",
+                        operation="SAP_POST",
+                        ref_id=payment_id,
+                        error_msg=str(e),
+                        payload=sap_payload
+                    )
 
                     return {
                         "status": "error",
@@ -1030,50 +1224,62 @@ class SapPaymentService:
 
     @staticmethod
     async def get_recent_incoming_payments(request, db_pool, current_user):
-
         tenant_schema = getattr(request.state, "schema")
 
-        # ✅ FIX: support your JWT structure
         user_id = current_user.get("user_id") or current_user.get("userId")
         email = current_user.get("email") or current_user.get("sub")
 
         async with db_pool.acquire() as conn:
 
-
             if user_id:
                 result = await conn.fetch(f'''
                     SELECT 
-                        payment_id,
-                        payment_date,
-                        customer_id,
-                        customer_name,
-                        document_total,
-                        sap_docentry,
-                        status
-                    FROM "{tenant_schema}".ik_inc_payment_header
-                    WHERE TRIM(created_by) = $1
-                    ORDER BY created_at DESC
+                        h.payment_id,
+                        h.payment_date,
+                        h.customer_id,
+                        h.customer_name,
+                        h.document_total,
+                        h.sap_docentry,
+                        h.status,
+
+                        (
+                            SELECT l.doc_num
+                            FROM "{tenant_schema}".ik_inc_payment_inv_line l
+                            WHERE l.payment_id = h.payment_id
+                            LIMIT 1
+                        ) AS doc_num
+
+                    FROM "{tenant_schema}".ik_inc_payment_header h
+                    WHERE TRIM(h.created_by) = $1
+                    ORDER BY h.created_at DESC
                     LIMIT 5
                 ''', str(user_id).strip())
 
             elif email:
                 result = await conn.fetch(f'''
                     SELECT 
-                        payment_id,
-                        payment_date,
-                        customer_id,
-                        customer_name,
-                        document_total,
-                        sap_docentry,
-                        status
-                    FROM "{tenant_schema}".ik_inc_payment_header
-                    WHERE LOWER(created_by) = LOWER($1)
-                    ORDER BY created_at DESC
+                        h.payment_id,
+                        h.payment_date,
+                        h.customer_id,
+                        h.customer_name,
+                        h.document_total,
+                        h.sap_docentry,
+                        h.status,
+
+                        (
+                            SELECT l.doc_num
+                            FROM "{tenant_schema}".ik_inc_payment_inv_line l
+                            WHERE l.payment_id = h.payment_id
+                            LIMIT 1
+                        ) AS doc_num
+
+                    FROM "{tenant_schema}".ik_inc_payment_header h
+                    WHERE LOWER(h.created_by) = LOWER($1)
+                    ORDER BY h.created_at DESC
                     LIMIT 5
                 ''', email)
 
             else:
-               
                 result = []
 
             data = [dict(row) for row in result]
@@ -1085,48 +1291,63 @@ class SapPaymentService:
                 "data": data
             }
 
+        
 
     @staticmethod
     async def get_recent_outgoing_payments(request, db_pool, current_user):
 
         tenant_schema = getattr(request.state, "schema")
 
-        # ✅ FIX: support your JWT structure
         user_id = current_user.get("user_id") or current_user.get("userId")
         email = current_user.get("email") or current_user.get("sub")
 
         async with db_pool.acquire() as conn:
 
-
             if user_id:
                 result = await conn.fetch(f'''
                     SELECT 
-                        payment_id,
-                        payment_date,
-                        vendor_id,
-                        vendor_name,
-                        document_total,
-                        sap_docentry,
-                        status
-                    FROM "{tenant_schema}".ik_out_payment_header
-                    WHERE TRIM(created_by) = $1
-                    ORDER BY created_at DESC
+                        h.payment_id,
+                        h.payment_date,
+                        h.vendor_id,
+                        h.vendor_name,
+                        h.document_total,
+                        h.sap_docentry,
+                        h.status,
+
+                        (
+                            SELECT l.doc_num
+                            FROM "{tenant_schema}".ik_out_payment_inv_line l
+                            WHERE l.payment_id = h.payment_id
+                            LIMIT 1
+                        ) AS doc_num
+
+                    FROM "{tenant_schema}".ik_out_payment_header h
+                    WHERE TRIM(h.created_by) = $1
+                    ORDER BY h.created_at DESC
                     LIMIT 5
                 ''', str(user_id).strip())
 
             elif email:
                 result = await conn.fetch(f'''
                     SELECT 
-                        payment_id,
-                        payment_date,
-                        vendor_id,
-                        vendor_name,
-                        document_total,
-                        sap_docentry,
-                        status
-                    FROM "{tenant_schema}".ik_out_payment_header
-                    WHERE LOWER(created_by) = LOWER($1)
-                    ORDER BY created_at DESC
+                        h.payment_id,
+                        h.payment_date,
+                        h.vendor_id,
+                        h.vendor_name,
+                        h.document_total,
+                        h.sap_docentry,
+                        h.status,
+
+                        (
+                            SELECT l.doc_num
+                            FROM "{tenant_schema}".ik_out_payment_inv_line l
+                            WHERE l.payment_id = h.payment_id
+                            LIMIT 1
+                        ) AS doc_num
+
+                    FROM "{tenant_schema}".ik_out_payment_header h
+                    WHERE LOWER(h.created_by) = LOWER($1)
+                    ORDER BY h.created_at DESC
                     LIMIT 5
                 ''', email)
 

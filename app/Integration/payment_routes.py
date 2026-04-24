@@ -138,18 +138,26 @@ async def get_supplier_invoices(
 
 @router.get("/branches")
 async def get_branches(
+    search: str = "",
     pool = Depends(get_db_pool),
     current_user: dict = Depends(get_current_user),
-    search: str = ""
 ):
     async with pool.acquire() as conn:
 
+        # Get tenant schema from logged-in user
         tenant_schema = current_user.get("company_schema")
 
+        # Optional safety check
+        if not tenant_schema:
+            return {
+                "status": "error",
+                "message": "Tenant schema not found for user"
+            }
+
         return await SapPaymentService.get_branches(
-            conn,
-            tenant_schema,
-            search
+            conn=conn,
+            tenant_schema=tenant_schema,
+            search=search
         )
 @router.post("/incoming")
 async def create_incoming_payment(

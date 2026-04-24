@@ -130,7 +130,9 @@ async def create_tenant_schema(conn, tenant_schema: str):
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
             gst_number VARCHAR(255),
-            pan_number VARCHAR(255)
+            pan_number VARCHAR(255),
+
+            balance NUMERIC(18,2) DEFAULT 0   -- ✅ added
 
         );
     ''')
@@ -155,12 +157,12 @@ async def create_tenant_schema(conn, tenant_schema: str):
         CREATE TABLE IF NOT EXISTS "{tenant_schema}".ik_glaccount (
 
             account_id VARCHAR(255) PRIMARY KEY,
-            account_name VARCHAR(100) NOT NULL,
-            is_active BOOLEAN NOT NULL DEFAULT TRUE
+            account_name VARCHAR(255) NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            balance NUMERIC(18,2) DEFAULT 0
 
         );
     ''')
-
     # ------------------------------------------------------
     # JWT TABLE
     # ------------------------------------------------------
@@ -247,28 +249,39 @@ async def create_tenant_schema(conn, tenant_schema: str):
 
     await conn.execute(f"""
 
+        -- =========================
+        -- SEQUENCES
+        -- =========================
         CREATE SEQUENCE IF NOT EXISTS "{tenant_schema}".ik_error_seq START 1;
         CREATE SEQUENCE IF NOT EXISTS "{tenant_schema}".ik_success_seq START 1;
 
+        -- =========================
+        -- ERROR TABLE
+        -- =========================
         CREATE TABLE IF NOT EXISTS "{tenant_schema}".ik_error (
 
-            error_id VARCHAR(255) PRIMARY KEY,
+            error_id VARCHAR(30) PRIMARY KEY,
 
             schema_id VARCHAR(255) NOT NULL,
 
-            executed_at DATE NOT NULL,
+            module VARCHAR(100),
+            operation VARCHAR(100),
+            ref_id VARCHAR(100),
 
-            type VARCHAR(250) NOT NULL,
+            executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-            error_desc TEXT NOT NULL,
-
+            error_desc TEXT,
             success_desc TEXT,
+
+            payload JSONB,
 
             CONSTRAINT fk_error_schema
                 FOREIGN KEY (schema_id)
                 REFERENCES ik_payops_b1.ik_config(schema_id)
 
+        
         );
+
 
 
         CREATE TABLE IF NOT EXISTS "{tenant_schema}".ik_success (

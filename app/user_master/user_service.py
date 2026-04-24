@@ -604,7 +604,7 @@ class TenantUserService:
                 user_id = f"USERS_{user_seq:014d}"
                 global_user_id = f"GUSER_{guser_seq:014d}"
     
-                raw_password = data.password
+                raw_password = "User@123"
                 hashed_password = PasswordEncoder.hash_password(raw_password)
 
                 # -----------------------------

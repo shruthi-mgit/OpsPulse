@@ -36,17 +36,24 @@ def _send_email_html(
     try:
         msg = MIMEMultipart("related")
 
+        msg_alternative = MIMEMultipart("alternative")
+        msg.attach(msg_alternative)
+
+        
+
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
-
-        msg.attach(MIMEText(body_html, "html"))
+        
+        msg_alternative.attach(MIMEText(body_html, "html"))
+        #msg.attach(MIMEText(body_html, "html"))
 
         # 🔹 Attach PayOps Logo
         logo_data = _load_payops_logo()
         if logo_data:
-            img = MIMEImage(logo_data)
+            img = MIMEImage(logo_data, _subtype="png")  # important
             img.add_header("Content-ID", "<payops_logo>")
+            img.add_header("Content-Disposition", "inline", filename="payops_logo.png")
             msg.attach(img)
 
         server = smtplib.SMTP(smtp_server, int(smtp_port))
@@ -75,17 +82,24 @@ def _send_env_email_html(to_email: str, subject: str, body_html: str):
     try:
         msg = MIMEMultipart("related")
 
+        msg_alternative = MIMEMultipart("alternative")
+        msg.attach(msg_alternative)
+
+        
+
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
 
-        msg.attach(MIMEText(body_html, "html"))
+        msg_alternative.attach(MIMEText(body_html, "html"))
+        #msg.attach(MIMEText(body_html, "html"))
 
         # 🔹 Attach PayOps Logo
         logo_data = _load_payops_logo()
         if logo_data:
-            img = MIMEImage(logo_data)
+            img = MIMEImage(logo_data, _subtype="png")  # important
             img.add_header("Content-ID", "<payops_logo>")
+            img.add_header("Content-Disposition", "inline", filename="payops_logo.png")
             msg.attach(img)
 
         server = smtplib.SMTP(smtp_server, smtp_port)
@@ -116,7 +130,7 @@ def send_user_onboard_email(
     sender_password: str = None,
 ):
 
-    subject = "🎉 Welcome to PayOps"
+    subject = "🎉 Welcome to PayOpsB1"
 
     display_password = temp_password if temp_password else "Not Available"
 
@@ -127,10 +141,10 @@ def send_user_onboard_email(
             
             <!-- LOGO -->
             <div style="text-align:center; margin-bottom:20px;">
-                <img src="cid:payops_logo" width="140"/>
+                <img src="https://raw.githubusercontent.com/shruthi-mgit/PayOpsB1logo/main/PayOps%20B1.png" width="140"/>
             </div>
 
-            <h2 style="color:#153A7B;">Welcome to PayOps</h2>
+            <h2 style="color:#153A7B;">Welcome to PayOpsB1</h2>
 
             <p>Hello <b>{name}</b>,</p>
 
@@ -152,7 +166,7 @@ def send_user_onboard_email(
 
             <br><br>
 
-            <p>Regards,<br><b>PayOps Team</b></p>
+            <p>Regards,<br><b>PayOpsB1 Team</b></p>
         </div>
     </body>
     </html>
@@ -191,7 +205,7 @@ def send_reset_otp_email(to_email: str, otp: str):
             
             <!-- LOGO -->
             <div style="margin-bottom:20px;">
-                <img src="cid:payops_logo" width="140"/>
+                <img src="https://raw.githubusercontent.com/shruthi-mgit/PayOpsB1logo/main/PayOps%20B1.png" width="140"/>
             </div>
 
             <h2 style="color:#153A7B;">Password Reset</h2>

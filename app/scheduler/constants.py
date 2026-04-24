@@ -4,3 +4,5 @@ ALLOWED_TYPES = {
     "BusinessPartner",
     "GLAccounts"
 }
+
+#SYNC_INTERVAL_MINUTES = 60

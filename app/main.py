@@ -8,6 +8,8 @@ from app.user_master.user_router import router as user_router
 from app.onboarding.onboarding_router import router as onboarding_router
 from app.Integration.payment_routes import router as payment_router
 from app.scheduler.scheduler import start_scheduler
+from app.scheduler.log_router import router as log_router
+
 
 from app.database import (
     init_db,
@@ -33,7 +35,18 @@ logging.getLogger("apscheduler").setLevel(logging.WARNING)
 # LOAD ENV
 # ==========================================================
 
-BASE_DIR = Path(__file__).resolve().parent
+from pathlib import Path
+import os
+import sys
+from dotenv import load_dotenv
+
+if getattr(sys, 'frozen', False):
+    # running as EXE → use current folder
+    BASE_DIR = Path(os.getcwd())
+else:
+    # normal run
+    BASE_DIR = Path(__file__).resolve().parent
+
 env_path = BASE_DIR / ".env"
 
 print("Loading .env from:", env_path)
@@ -66,60 +79,40 @@ app.add_middleware(
 # STATIC FILES (FIXED ✅)
 # ==========================================================
 
-def get_static_path():
-    """
-    Handles both:
-    - Dev mode
-    - PyInstaller EXE
-    - External D drive (recommended)
-    """
 
-    # ✅ Recommended: use D drive static
-    external_static = Path("D:/PayOpsUploads/static")
+if getattr(sys, 'frozen', False):
+    # EXE mode → PyInstaller temp folder
+    BASE_PATH = Path(sys._MEIPASS)
+else:
+    # normal mode
+    BASE_PATH = Path(__file__).resolve().parent
 
-    if external_static.exists():
-        print(f"✅ Using external static path: {external_static}")
-        return str(external_static)
+STATIC_DIR = BASE_PATH / "static"
 
-    # ✅ Fallback for EXE
-    if getattr(sys, "frozen", False):
-        base_path = Path(sys._MEIPASS)
-    else:
-        base_path = Path(__file__).resolve().parent
-
-    internal_static = base_path / "app" / "static"
-
-    print(f"⚠️ Using internal static path: {internal_static}")
-
-    return str(internal_static)
-
-
-STATIC_DIR = get_static_path()
-
-# Ensure directory exists (important)
-os.makedirs(STATIC_DIR, exist_ok=True)
+print("STATIC DIR:", STATIC_DIR)
 
 app.mount(
     "/static",
-    StaticFiles(directory=STATIC_DIR),
+    StaticFiles(directory=str(STATIC_DIR)),
     name="static"
 )
-
 # ==========================================================
 # STARTUP
 # ==========================================================
 
 @app.on_event("startup")
 async def startup():
-
+    
     await init_db()
     pool = await get_db_pool()
 
     app.state.db_pool = pool
+    
 
     async with pool.acquire() as conn:
         await init_global_database(conn)
         await seed_super_admin(conn)
+        
 
     # Start scheduler
     start_scheduler(pool)
@@ -139,6 +132,7 @@ configure_security(app)
 app.include_router(user_router, prefix="/payopsb1/api/user_master")
 app.include_router(onboarding_router, prefix="/payopsb1/api")
 app.include_router(payment_router, prefix="/payopsb1/api")
+app.include_router(log_router, prefix="/payopsb1/api")
 
 # ==========================================================
 # HEALTH CHECK

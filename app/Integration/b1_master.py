@@ -83,6 +83,7 @@ class SapMasterService:
 
         account_id = data.get("Code")
         account_name = data.get("Name")
+        balance = float(data.get("Balance") or 0)   # ✅ NEW
 
         if not account_id:
             raise ValueError("account_id required")
@@ -96,16 +97,19 @@ class SapMasterService:
             (
                 account_id,
                 account_name,
-                is_active
+                is_active,
+                balance
             )
             VALUES
-            ($1,$2,TRUE)
+            ($1,$2,TRUE,$3)
 
             ON CONFLICT (account_id)
             DO UPDATE SET
                 account_name = EXCLUDED.account_name,
+                balance = EXCLUDED.balance,   -- ✅ IMPORTANT
                 is_active = TRUE
             """,
             account_id,
             account_name,
+            balance   # ✅ NEW PARAM
         )

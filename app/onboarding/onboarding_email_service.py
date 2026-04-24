@@ -33,22 +33,29 @@ def _send_email_html(
     try:
         msg = MIMEMultipart("related")
 
+        msg_alternative = MIMEMultipart("alternative")
+        msg.attach(msg_alternative)
+
+        msg_alternative.attach(MIMEText(body_html, "html"))
+
         msg["From"] = SENDER_EMAIL
         msg["To"] = to_email
         msg["Subject"] = subject
 
-        msg.attach(MIMEText(body_html, "html"))
+        #msg.attach(MIMEText(body_html, "html"))
 
         # 🔹 PayOps Logo (static → convert to bytes)
         if payops_logo_data:
-            img = MIMEImage(payops_logo_data)
+            img = MIMEImage(payops_logo_data, _subtype="png")  # or "jpeg"
             img.add_header("Content-ID", "<payops_logo>")
+            img.add_header("Content-Disposition", "inline", filename="payops_logo.png")
             msg.attach(img)
 
         # 🔹 Company Logo (dynamic from DB/API)
         if company_logo_data:
-            img = MIMEImage(company_logo_data)
+            img = MIMEImage(company_logo_data, _subtype="png")
             img.add_header("Content-ID", "<company_logo>")
+            img.add_header("Content-Disposition", "inline", filename="company_logo.png")
             msg.attach(img)
 
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
@@ -81,7 +88,7 @@ def send_activation_email(
 
     # 🔹 Load PayOps logo (static file → bytes)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    payops_logo_path = os.path.join(base_dir, "static", "payops_logo.png")
+    payops_logo_path = os.path.join(base_dir, "static", "common", "payops_logo.png")
 
     payops_logo_data = None
     if os.path.exists(payops_logo_path):
@@ -115,7 +122,7 @@ def send_activation_email(
                                 <table width="100%">
                                     <tr>
                                         <td align="left">
-                                            <img src="cid:payops_logo" width="160"/>
+                                            <img src="https://raw.githubusercontent.com/shruthi-mgit/PayOpsB1logo/main/PayOps%20B1.png" width="160"/>
                                         </td>
 
                                         <td align="right">
@@ -125,7 +132,7 @@ def send_activation_email(
                                 </table>
 
                                 <h2 style="color:white; text-align:center; margin-top:20px;">
-                                    🚀 Welcome to PayOps
+                                    🚀 Welcome to PayOpsB1
                                 </h2>
                             </td>
                         </tr>
@@ -157,11 +164,11 @@ def send_activation_email(
                                     <a href="https://your-payops-login-url"
                                        style="background:#153A7B; color:white; padding:12px 30px;
                                               text-decoration:none; border-radius:6px;">
-                                        🔐 Login to PayOps
+                                        🔐 Login to PayOpsB1
                                     </a>
                                 </div>
 
-                                <p>Regards,<br><b>PayOps Team</b></p>
+                                <p>Regards,<br><b>PayOpsB1 Team</b></p>
 
                             </td>
                         </tr>
@@ -170,7 +177,7 @@ def send_activation_email(
                         <tr>
                             <td style="background:#f6f7fb; text-align:center; padding:20px;
                                        font-size:12px; color:#777;">
-                                © 2026 PayOps. All rights reserved.
+                                © 2026 PayOpsB1. All rights reserved.
                             </td>
                         </tr>
 
