@@ -37,6 +37,7 @@ class LogService:
         schema_id,
         type,
         msg,
+        payload=None
     ):
 
         self.validate(type)
@@ -46,7 +47,9 @@ class LogService:
             schema_id,
             type,
             msg,
+            payload
         )
+
 
     # =========================
     # LOG SUCCESS (WRITE)
@@ -57,6 +60,7 @@ class LogService:
         schema_id,
         type,
         msg,
+        payload=None
     ):
 
         self.validate(type)
@@ -66,7 +70,9 @@ class LogService:
             schema_id,
             type,
             msg,
+            payload
         )
+
 
     # =========================
     # GET SUCCESS LOGS (READ)
@@ -185,7 +191,7 @@ class LogService:
                 UNION ALL
 
                 SELECT 
-                    type AS job_name,
+                    module AS job_name,   -- ✅ FIX
                     NULL AS last_sync,
                     executed_at,
                     error_desc AS message,

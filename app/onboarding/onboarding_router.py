@@ -83,7 +83,7 @@ async def upload_logo(
         company = await conn.fetchrow(
             """
             SELECT schema_id
-            FROM ik_payops_b1.ik_onboarding_company
+            FROM ik_opspulse_b1.ik_onboarding_company
             WHERE onboard_company_id = $1
             """,
             onboard_company_id
@@ -116,7 +116,7 @@ async def update_logo(
         company = await conn.fetchrow(
             """
             SELECT schema_id
-            FROM ik_payops_b1.ik_onboarding_company
+            FROM ik_opspulse_b1.ik_onboarding_company
             WHERE onboard_company_id = $1
             """,
             onboard_company_id

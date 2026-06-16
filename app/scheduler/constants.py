@@ -1,8 +1,14 @@
-ALLOWED_TYPES = {
+ALLOWED_TYPES = [
     "Branch",
     "Bank",
+    "GLAccounts",
     "BusinessPartner",
-    "GLAccounts"
-}
-
-#SYNC_INTERVAL_MINUTES = 60
+    "Bin",
+    "Warehouse",
+    "MerchantID",
+    "Item",
+    "IncomingPayment",
+    "OutgoingPayment",
+    "Notification",
+    "GLOBAL_ERROR"
+]

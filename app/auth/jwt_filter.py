@@ -30,7 +30,7 @@ class JWTFilter:
             return {
                 "username": None,
                 "user_id": None,
-                "company_schema": "ik_payops_b1",
+                "company_schema": "ik_opspulse_b1",
                 "role": None,
                 "roles": [],
                 "token": None,

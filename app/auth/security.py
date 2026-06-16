@@ -13,20 +13,22 @@ from app.auth.jwt_utils import JWTUtility
 
 logger = logging.getLogger("security")
 
-SYSTEM_SCHEMA = "ik_payops_b1"
+SYSTEM_SCHEMA = "ik_opspulse_b1"
 
 # Public but OPTIONAL AUTH endpoints
 OPTIONAL_AUTH_ENDPOINTS = {
-    "/payopsb1/api/add_onboarding_form",
-    "/payopsb1/api/user_master/forgot-password",
-    "/payopsb1/api/user_master/verify-otp-reset",
+    "/Opspulseb1/api/add_onboarding_form",
+    "/Opspulseb1/api/user_master/forgot-password",
+    "/Opspulseb1/api/user_master/verify-otp-reset",
+    
 
 }
 
 # Fully public endpoints (no auth processing at all)
 PUBLIC_ENDPOINTS = {
-    "/payopsb1/api/user_master/login-authenticate",
+    "/Opspulseb1/api/user_master/login-authenticate",
     "/api/onboarding_form/basic_onboarding/company-logo",
+    "/Opspulseb1/api/payment/incoming/patch_paymeans_lines_by_payment_id/{payment_id}",
 }
 
 PUBLIC_PREFIXES = (
@@ -34,6 +36,7 @@ PUBLIC_PREFIXES = (
     "/redoc",
     "/openapi.json",
     "/health",
+    "/Opspulseb1/api/payment/incoming/patch_paymeans_lines_by_payment_id", 
 )
 
 

@@ -9,8 +9,9 @@ from app.onboarding.onboarding_router import router as onboarding_router
 from app.Integration.payment_routes import router as payment_router
 from app.scheduler.scheduler import start_scheduler
 from app.scheduler.log_router import router as log_router
-
-
+#from app.core.trial_guard import init_trial
+from app.Integration.inventory_router import router as inventory_router
+from app.Integration.upi_routes import router as upi_router
 from app.database import (
     init_db,
     get_db_pool,
@@ -23,6 +24,9 @@ from dotenv import load_dotenv
 from pathlib import Path
 import os
 import sys
+
+sys.stdout.reconfigure(encoding="utf-8", errors="ignore")
+sys.stderr.reconfigure(encoding="utf-8", errors="ignore")
 
 # ==========================================================
 # LOGGING
@@ -61,9 +65,11 @@ print("ENV PASSWORD:", "YES" if os.getenv("SENDER_PASSWORD") else "NO")
 # ==========================================================
 
 app = FastAPI(
-    title="PayOpsB1 API",
+    title="OpsPulseB1 API",
     version="1.0.0"
 )
+
+
 
 security = HTTPBearer()
 
@@ -117,7 +123,11 @@ async def startup():
     # Start scheduler
     start_scheduler(pool)
 
-    print("✅ Application startup completed")
+    
+
+    print("Application startup completed")
+
+#init_trial(app)
 
 # ==========================================================
 # SECURITY
@@ -129,10 +139,12 @@ configure_security(app)
 # ROUTERS
 # ==========================================================
 
-app.include_router(user_router, prefix="/payopsb1/api/user_master")
-app.include_router(onboarding_router, prefix="/payopsb1/api")
-app.include_router(payment_router, prefix="/payopsb1/api")
-app.include_router(log_router, prefix="/payopsb1/api")
+app.include_router(user_router, prefix="/Opspulseb1/api/user_master")
+app.include_router(onboarding_router, prefix="/Opspulseb1/api")
+app.include_router(payment_router, prefix="/Opspulseb1/api")
+app.include_router(log_router, prefix="/Opspulseb1/api")
+app.include_router(inventory_router, prefix="/Opspulseb1/api")
+app.include_router(upi_router,prefix="/Opspulseb1/api")
 
 # ==========================================================
 # HEALTH CHECK
@@ -140,7 +152,7 @@ app.include_router(log_router, prefix="/payopsb1/api")
 
 @app.get("/")
 def root():
-    return {"status": "PayOpsB1 API Running"}
+    return {"status": "OpspulseB1 API Running"}
 
 # ==========================================================
 # ENV VARIABLES
@@ -149,7 +161,7 @@ def root():
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 SECRET_KEY = os.getenv(
-    "PayOpsB1_SuperSecure_JWT_Secret_Key_2026_Production"
+    "OpspulseB1_SuperSecure_JWT_Secret_Key_2026_Production"
 )
 
 # ==========================================================
@@ -161,9 +173,9 @@ if __name__ == "__main__":
     import uvicorn
 
     host = os.getenv("UVICORN_HOST", "0.0.0.0")
-    port = int(os.getenv("UVICORN_PORT", "8083"))
+    port = int(os.getenv("UVICORN_PORT", "8089"))
 
-    print(f"🚀 Starting server on {host}:{port}")
+    print(f"Starting server on {host}:{port}")
 
     uvicorn.run(
         app,

@@ -7,9 +7,9 @@ logger = logging.getLogger("sequence-generator")
 async def generate_prefixed_id(
     db_pool: asyncpg.Pool,
     prefix: str,
-    number_format: str = "%014d",
+    number_format: str = "%d",
     sequence_name: str = None,
-    schema: str = "ik_payops_b1",
+    schema: str = "ik_opspulse_b1",
 ) -> str:
 
     # ✅ use separate sequence per prefix

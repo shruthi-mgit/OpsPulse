@@ -19,7 +19,7 @@ class JWTRepository:
     async def find_by_user_id(
         self,
         user_id: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> Optional[Dict[str, Any]]:
         """
         Find JWT record by user ID
@@ -52,7 +52,7 @@ class JWTRepository:
     async def find_by_token(
         self,
         token: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> Optional[Dict[str, Any]]:
         """Find JWT record by token"""
         try:
@@ -79,7 +79,7 @@ class JWTRepository:
         user_id: str,
         jwt_token: str,
         role: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> bool:
         """
         Insert new JWT record
@@ -115,7 +115,7 @@ class JWTRepository:
         user_id: str,
         jwt_token: str,
         role: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> bool:
         """
         Update existing JWT record
@@ -149,7 +149,7 @@ class JWTRepository:
     async def delete_by_token(
         self,
         token: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> bool:
         """
         Delete JWT record by token
@@ -180,7 +180,7 @@ class JWTRepository:
     async def delete_by_user_id(
         self,
         user_id: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> bool:
         """Delete JWT record by user ID"""
         try:

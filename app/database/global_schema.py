@@ -2,7 +2,7 @@ import logging
 
 logger = logging.getLogger("database")
 
-GLOBAL_SCHEMA = "ik_payops_b1"
+GLOBAL_SCHEMA = "ik_opspulse_b1"
 
 
 # ==========================================================
@@ -12,7 +12,7 @@ GLOBAL_SCHEMA = "ik_payops_b1"
 async def create_global_schema(conn):
 
     await conn.execute("""
-        CREATE SCHEMA IF NOT EXISTS ik_payops_b1;
+        CREATE SCHEMA IF NOT EXISTS ik_opspulse_b1;
     """)
 
 
@@ -24,20 +24,20 @@ async def create_global_sequences(conn):
 
     await conn.execute("""
 
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.onboarding_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.global_user_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.company_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.user_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.success_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.error_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.vendor_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.jwt_id_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.config_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.notification_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.notification_line_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.ik_error_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.ik_inc_payment_seq START 1;
-        CREATE SEQUENCE IF NOT EXISTS ik_payops_b1.ik_inc_payment_line_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.onboarding_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.global_user_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.company_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.user_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.success_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.error_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.vendor_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.jwt_id_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.config_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.notification_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.notification_line_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.ik_error_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.ik_inc_payment_seq START 1;
+        CREATE SEQUENCE IF NOT EXISTS ik_opspulse_b1.ik_inc_payment_line_seq START 1;
 
 
     """)
@@ -51,7 +51,7 @@ async def create_global_users_table(conn):
 
     await conn.execute("""
 
-        CREATE TABLE IF NOT EXISTS ik_payops_b1.ik_global_users (
+        CREATE TABLE IF NOT EXISTS ik_opspulse_b1.ik_global_users (
 
             global_user_id VARCHAR(50) PRIMARY KEY,
 
@@ -92,7 +92,7 @@ async def create_config_table(conn):
 
     await conn.execute("""
 
-        CREATE TABLE IF NOT EXISTS ik_payops_b1.ik_config (
+        CREATE TABLE IF NOT EXISTS ik_opspulse_b1.ik_config (
 
             config_id VARCHAR(255) PRIMARY KEY,
 
@@ -118,11 +118,11 @@ async def create_config_table(conn):
 
             CONSTRAINT fk_config_created_user
                 FOREIGN KEY (created_by)
-                REFERENCES ik_payops_b1.ik_global_users(user_id),
+                REFERENCES ik_opspulse_b1.ik_global_users(user_id),
 
             CONSTRAINT fk_config_updated_user
                 FOREIGN KEY (updated_by)
-                REFERENCES ik_payops_b1.ik_global_users(user_id)
+                REFERENCES ik_opspulse_b1.ik_global_users(user_id)
 
         );
 
@@ -136,7 +136,7 @@ async def create_jwt_table(conn):
 
     await conn.execute("""
 
-        CREATE TABLE IF NOT EXISTS ik_payops_b1.jwtresponse (
+        CREATE TABLE IF NOT EXISTS ik_opspulse_b1.jwtresponse (
 
             jwt_id VARCHAR(255) PRIMARY KEY,
             jwt_token VARCHAR(999) NOT NULL,
@@ -156,7 +156,7 @@ async def create_onboarding_company_table(conn):
 
     await conn.execute("""
 
-        CREATE TABLE IF NOT EXISTS ik_payops_b1.ik_onboarding_company (
+        CREATE TABLE IF NOT EXISTS ik_opspulse_b1.ik_onboarding_company (
 
             onboard_company_id VARCHAR(50) PRIMARY KEY,
 
@@ -203,15 +203,15 @@ async def create_onboarding_company_table(conn):
 
             CONSTRAINT fk_schema
                 FOREIGN KEY (schema_id)
-                REFERENCES ik_payops_b1.ik_config(schema_id),
+                REFERENCES ik_opspulse_b1.ik_config(schema_id),
 
             CONSTRAINT fk_created_user
                 FOREIGN KEY (created_by)
-                REFERENCES ik_payops_b1.ik_global_users(user_id),
+                REFERENCES ik_opspulse_b1.ik_global_users(user_id),
 
             CONSTRAINT fk_updated_user
                 FOREIGN KEY (updated_by)
-                REFERENCES ik_payops_b1.ik_global_users(user_id)
+                REFERENCES ik_opspulse_b1.ik_global_users(user_id)
 
         );
 

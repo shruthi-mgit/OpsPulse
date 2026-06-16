@@ -17,7 +17,7 @@ def _send_email_html(
     to_email: str,
     subject: str,
     body_html: str,
-    payops_logo_data: bytes = None,
+    opspulse_logo_data: bytes = None,
     company_logo_data: bytes = None,
 ):
 
@@ -44,11 +44,11 @@ def _send_email_html(
 
         #msg.attach(MIMEText(body_html, "html"))
 
-        # 🔹 PayOps Logo (static → convert to bytes)
-        if payops_logo_data:
-            img = MIMEImage(payops_logo_data, _subtype="png")  # or "jpeg"
-            img.add_header("Content-ID", "<payops_logo>")
-            img.add_header("Content-Disposition", "inline", filename="payops_logo.png")
+        # 🔹 opspulse Logo (static → convert to bytes)
+        if opspulse_logo_data:
+            img = MIMEImage(opspulse_logo_data, _subtype="png")  # or "jpeg"
+            img.add_header("Content-ID", "<opspulse_logo>")
+            img.add_header("Content-Disposition", "inline", filename="opspulse_logo.png")
             msg.attach(img)
 
         # 🔹 Company Logo (dynamic from DB/API)
@@ -84,16 +84,16 @@ def send_activation_email(
     company_logo_data: bytes = None,   # 👈 from DB
 ):
 
-    subject = f"🎉 Welcome to PayOps - {company_name}"
+    subject = f"🎉 Welcome to opspulse - {company_name}"
 
-    # 🔹 Load PayOps logo (static file → bytes)
+    # 🔹 Load opspulse logo (static file → bytes)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    payops_logo_path = os.path.join(base_dir, "static", "common", "payops_logo.png")
+    opspulse_logo_path = os.path.join(base_dir, "static", "common", "opspulse_logo.png")
 
-    payops_logo_data = None
-    if os.path.exists(payops_logo_path):
-        with open(payops_logo_path, "rb") as f:
-            payops_logo_data = f.read()
+    opspulse_logo_data = None
+    if os.path.exists(opspulse_logo_path):
+        with open(opspulse_logo_path, "rb") as f:
+            opspulse_logo_data = f.read()
 
     # ==========================================================
     # HTML TEMPLATE 
@@ -122,7 +122,7 @@ def send_activation_email(
                                 <table width="100%">
                                     <tr>
                                         <td align="left">
-                                            <img src="https://raw.githubusercontent.com/shruthi-mgit/PayOpsB1logo/main/PayOps%20B1.png" width="160"/>
+                                            <img src="https://raw.githubusercontent.com/shruthi-mgit/opspulseB1logo/main/OpsPulse_B1.png" width="160"/>
                                         </td>
 
                                         <td align="right">
@@ -132,7 +132,7 @@ def send_activation_email(
                                 </table>
 
                                 <h2 style="color:white; text-align:center; margin-top:20px;">
-                                    🚀 Welcome to PayOpsB1
+                                    🚀 Welcome to opspulseB1
                                 </h2>
                             </td>
                         </tr>
@@ -161,14 +161,21 @@ def send_activation_email(
                                 <p style="color:red;">⚠️ Please change your password after login.</p>
 
                                 <div style="text-align:center; margin:30px 0;">
-                                    <a href="https://your-payops-login-url"
-                                       style="background:#153A7B; color:white; padding:12px 30px;
-                                              text-decoration:none; border-radius:6px;">
-                                        🔐 Login to PayOpsB1
+                                    <a href="https://opspulseb1.web.app/login"
+                                    target="_blank"
+                                    style="
+                                            background:#153A7B;
+                                            color:white;
+                                            padding:12px 30px;
+                                            text-decoration:none;
+                                            border-radius:6px;
+                                            display:inline-block;
+                                    ">
+                                        🔐 Login to opspulseB1
                                     </a>
                                 </div>
 
-                                <p>Regards,<br><b>PayOpsB1 Team</b></p>
+                                <p>Regards,<br><b>opspulseB1 Team</b></p>
 
                             </td>
                         </tr>
@@ -177,7 +184,7 @@ def send_activation_email(
                         <tr>
                             <td style="background:#f6f7fb; text-align:center; padding:20px;
                                        font-size:12px; color:#777;">
-                                © 2026 PayOpsB1. All rights reserved.
+                                © 2026 opspulseB1. All rights reserved.
                             </td>
                         </tr>
 
@@ -199,6 +206,6 @@ def send_activation_email(
         to_email=to_email,
         subject=subject,
         body_html=body_html,
-        payops_logo_data=payops_logo_data,
+        opspulse_logo_data=opspulse_logo_data,
         company_logo_data=company_logo_data
     )

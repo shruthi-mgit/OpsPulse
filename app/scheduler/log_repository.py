@@ -12,11 +12,7 @@ class LogRepository:
         q = f"""
         SELECT
         'ERROR_' ||
-        LPAD(
-            nextval('{schema}.ik_error_seq')::text,
-            14,
-            '0'
-        )
+        nextval('{schema}.ik_error_seq')::text
         """
 
         return await self.conn.fetchval(q)
@@ -31,79 +27,84 @@ class LogRepository:
         q = f"""
         SELECT
         'SUCCS_' ||
-        LPAD(
-            nextval('{schema}.ik_success_seq')::text,
-            14,
-            '0'
-        )
+        nextval('{schema}.ik_success_seq')::text
         """
 
         return await self.conn.fetchval(q)
 
-
-    # -------------------------
+    # =========================
     # INSERT ERROR
-    # -------------------------
+    # =========================
     async def insert_error(
         self,
         schema,
         schema_id,
         type,
-        error_desc,
+        msg,
+        payload=None
     ):
+
+        import json
+        from datetime import datetime
 
         error_id = await self.generate_error_id(schema)
 
-        await self.conn.execute(
-            f"""
-            INSERT INTO {schema}.ik_error
+        await self.conn.execute(f'''
+            INSERT INTO "{schema}".ik_error
             (
                 error_id,
                 schema_id,
                 executed_at,
                 type,
-                error_desc
+                error_desc,
+                json
             )
-            VALUES ($1,$2,$3,$4,$5)
-            """,
+            VALUES ($1,$2,$3,$4,$5,$6)
+        ''',
             error_id,
             schema_id,
-            datetime.utcnow(),
+            datetime.now(),
             type,
-            error_desc,
+            msg,
+            json.dumps(payload) if payload else None
         )
 
-
-    # -------------------------
+    # =========================
     # INSERT SUCCESS
-    # -------------------------
+    # =========================
     async def insert_success(
         self,
         schema,
         schema_id,
         type,
-        success_desc,
+        msg,
+        payload=None
     ):
+
+        import json
+        from datetime import datetime
 
         success_id = await self.generate_success_id(schema)
 
-        await self.conn.execute(
-            f"""
-            INSERT INTO {schema}.ik_success
+        await self.conn.execute(f'''
+            INSERT INTO "{schema}".ik_success
             (
                 success_id,
                 schema_id,
                 executed_at,
                 type,
                 last_sync_at,
-                success_desc
+                success_desc,
+                json
             )
-            VALUES ($1,$2,$3,$4,$5,$6)
-            """,
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
+        ''',
             success_id,
             schema_id,
-            datetime.utcnow(),
+            datetime.now(),
             type,
-            datetime.utcnow(),
-            success_desc,
+            datetime.now(),
+            msg,
+            json.dumps(payload) if payload else None
         )
+

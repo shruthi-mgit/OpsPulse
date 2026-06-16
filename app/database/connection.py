@@ -53,8 +53,10 @@ async def init_db():
 
         db_pool = await asyncpg.create_pool(
             DATABASE_URL,
-            min_size=2,
-            max_size=10,
+            min_size=5,
+            max_size=30,
+            max_inactive_connection_lifetime=300,
+            command_timeout=60
         )
 
         async with db_pool.acquire() as conn:
@@ -76,4 +78,31 @@ async def get_db_pool():
     if db_pool is None:
         raise RuntimeError("DB pool not ready")
 
+    logger.info(
+        f"Pool Size={db_pool.get_size()} "
+        f"Idle={db_pool.get_idle_size()}"
+    )
+
     return db_pool
+
+ICICI_BASE_URL = os.getenv("ICICI_BASE_URL")
+ICICI_PFX_PASSWORD = os.getenv("ICICI_PFX_PASSWORD")
+ICICI_CERT_FILE = os.getenv("ICICI_CERT_FILE")
+ICICI_PFX_FILE = os.getenv("ICICI_PFX_FILE")
+
+if not ICICI_BASE_URL:
+    raise RuntimeError("ICICI_BASE_URL not set")
+
+if not ICICI_PFX_PASSWORD:
+    raise RuntimeError("ICICI_PFX_PASSWORD not set")
+
+if not ICICI_CERT_FILE:
+    raise RuntimeError("ICICI_CERT_FILE not set")
+
+if not ICICI_PFX_FILE:
+    raise RuntimeError("ICICI_PFX_FILE not set")
+
+print("ICICI_BASE_URL =", ICICI_BASE_URL)
+print("ICICI_CERT_FILE =", ICICI_CERT_FILE)
+print("ICICI_PFX_FILE =", ICICI_PFX_FILE)
+print("ICICI_PFX_PASSWORD exists =", bool(ICICI_PFX_PASSWORD))

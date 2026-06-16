@@ -10,7 +10,7 @@ class OnboardingRepository:
         return await conn.fetchrow(
             """
             SELECT user_id
-            FROM ik_payops_b1.ik_global_users
+            FROM ik_opspulse_b1.ik_global_users
             WHERE email=$1
             """,
             email
@@ -26,7 +26,7 @@ class OnboardingRepository:
         return await conn.fetchrow(
             """
             SELECT 1
-            FROM ik_payops_b1.ik_onboarding_company
+            FROM ik_opspulse_b1.ik_onboarding_company
             WHERE email=$1
             """,
             email
@@ -40,7 +40,7 @@ class OnboardingRepository:
     async def get_next_onboarding_seq(conn):
 
         return await conn.fetchval(
-            "SELECT nextval('ik_payops_b1.onboarding_seq')"
+            "SELECT nextval('ik_opspulse_b1.onboarding_seq')"
         )
 
     # ===============================
@@ -57,7 +57,7 @@ class OnboardingRepository:
 
         await conn.execute(
             """
-            INSERT INTO ik_payops_b1.ik_onboarding_company
+            INSERT INTO ik_opspulse_b1.ik_onboarding_company
             (
                 onboard_company_id,
                 company_phone_no,
@@ -195,7 +195,7 @@ class OnboardingRepository:
 
         await conn.execute(
             """
-            INSERT INTO ik_payops_b1.ik_global_users
+            INSERT INTO ik_opspulse_b1.ik_global_users
             (
                 global_user_id,
                 user_id,
@@ -249,7 +249,7 @@ class OnboardingRepository:
 
         await conn.execute(
             """
-            INSERT INTO ik_payops_b1.ik_config
+            INSERT INTO ik_opspulse_b1.ik_config
             (
                 config_id,
                 schema_id,
@@ -294,7 +294,7 @@ class OnboardingRepository:
 
         await conn.execute(
             """
-            UPDATE ik_payops_b1.ik_onboarding_company
+            UPDATE ik_opspulse_b1.ik_onboarding_company
             SET
                 schema_id=$1,
                 is_approved=TRUE,
@@ -318,7 +318,7 @@ class OnboardingRepository:
             return await conn.fetch(
                 """
                 SELECT *
-                FROM ik_payops_b1.ik_onboarding_company
+                FROM ik_opspulse_b1.ik_onboarding_company
                 ORDER BY created_at DESC
                 """
             )
@@ -334,7 +334,7 @@ class OnboardingRepository:
             return await conn.fetchrow(
                 """
                 SELECT *
-                FROM ik_payops_b1.ik_onboarding_company
+                FROM ik_opspulse_b1.ik_onboarding_company
                 WHERE onboard_company_id=$1
                 """,
                 company_id
@@ -345,7 +345,7 @@ class OnboardingRepository:
         return await conn.fetchrow(
             """
             SELECT 1
-            FROM ik_payops_b1.ik_onboarding_company
+            FROM ik_opspulse_b1.ik_onboarding_company
             WHERE onboard_company_id = $1
             """,
             onboard_company_id
@@ -355,7 +355,7 @@ class OnboardingRepository:
     async def update_logo(conn, onboard_company_id, file_bytes):
         await conn.execute(
             """
-            UPDATE ik_payops_b1.ik_onboarding_company
+            UPDATE ik_opspulse_b1.ik_onboarding_company
             SET company_logo = $1,
                 updated_at = NOW()
             WHERE onboard_company_id = $2
@@ -372,7 +372,7 @@ class OnboardingRepository:
         return await conn.fetchrow(
             """
             SELECT company_logo
-            FROM ik_payops_b1.ik_onboarding_company
+            FROM ik_opspulse_b1.ik_onboarding_company
             WHERE onboard_company_id = $1
             """,
             onboard_company_id

@@ -6,12 +6,12 @@ from email.mime.image import MIMEImage
 
 
 # ==========================================================
-# LOAD PAYOPS LOGO (COMMON)
+# LOAD opspulse LOGO (COMMON)
 # ==========================================================
 
-def _load_payops_logo():
+def _load_opspulse_logo():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    logo_path = os.path.join(base_dir, "static", "payops_logo.png")
+    logo_path = os.path.join(base_dir, "static", "opspulse_logo.png")
 
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as f:
@@ -48,12 +48,12 @@ def _send_email_html(
         msg_alternative.attach(MIMEText(body_html, "html"))
         #msg.attach(MIMEText(body_html, "html"))
 
-        # 🔹 Attach PayOps Logo
-        logo_data = _load_payops_logo()
+        # 🔹 Attach opspulse Logo
+        logo_data = _load_opspulse_logo()
         if logo_data:
             img = MIMEImage(logo_data, _subtype="png")  # important
-            img.add_header("Content-ID", "<payops_logo>")
-            img.add_header("Content-Disposition", "inline", filename="payops_logo.png")
+            img.add_header("Content-ID", "<opspulse_logo>")
+            img.add_header("Content-Disposition", "inline", filename="opspulse_logo.png")
             msg.attach(img)
 
         server = smtplib.SMTP(smtp_server, int(smtp_port))
@@ -94,12 +94,12 @@ def _send_env_email_html(to_email: str, subject: str, body_html: str):
         msg_alternative.attach(MIMEText(body_html, "html"))
         #msg.attach(MIMEText(body_html, "html"))
 
-        # 🔹 Attach PayOps Logo
-        logo_data = _load_payops_logo()
+        # 🔹 Attach opspulse Logo
+        logo_data = _load_opspulse_logo()
         if logo_data:
             img = MIMEImage(logo_data, _subtype="png")  # important
-            img.add_header("Content-ID", "<payops_logo>")
-            img.add_header("Content-Disposition", "inline", filename="payops_logo.png")
+            img.add_header("Content-ID", "<opspulse_logo>")
+            img.add_header("Content-Disposition", "inline", filename="opspulse_logo.png")
             msg.attach(img)
 
         server = smtplib.SMTP(smtp_server, smtp_port)
@@ -130,7 +130,7 @@ def send_user_onboard_email(
     sender_password: str = None,
 ):
 
-    subject = "🎉 Welcome to PayOpsB1"
+    subject = "🎉 Welcome to opspulseB1"
 
     display_password = temp_password if temp_password else "Not Available"
 
@@ -141,10 +141,10 @@ def send_user_onboard_email(
             
             <!-- LOGO -->
             <div style="text-align:center; margin-bottom:20px;">
-                <img src="https://raw.githubusercontent.com/shruthi-mgit/PayOpsB1logo/main/PayOps%20B1.png" width="140"/>
+                <img src="https://raw.githubusercontent.com/shruthi-mgit/opspulseB1logo/main/OpsPulse_B1.png" width="140"/>
             </div>
 
-            <h2 style="color:#153A7B;">Welcome to PayOpsB1</h2>
+            <h2 style="color:#153A7B;">Welcome to opspulseB1</h2>
 
             <p>Hello <b>{name}</b>,</p>
 
@@ -166,7 +166,7 @@ def send_user_onboard_email(
 
             <br><br>
 
-            <p>Regards,<br><b>PayOpsB1 Team</b></p>
+            <p>Regards,<br><b>opspulseB1 Team</b></p>
         </div>
     </body>
     </html>
@@ -205,7 +205,7 @@ def send_reset_otp_email(to_email: str, otp: str):
             
             <!-- LOGO -->
             <div style="margin-bottom:20px;">
-                <img src="https://raw.githubusercontent.com/shruthi-mgit/PayOpsB1logo/main/PayOps%20B1.png" width="140"/>
+                <img src="https://raw.githubusercontent.com/shruthi-mgit/opspulseB1logo/main/OpsPulse_B1.png" width="140"/>
             </div>
 
             <h2 style="color:#153A7B;">Password Reset</h2>
@@ -222,7 +222,7 @@ def send_reset_otp_email(to_email: str, otp: str):
 
             <br>
 
-            <p>Regards,<br><b>PayOps Team</b></p>
+            <p>Regards,<br><b>opspulse Team</b></p>
         </div>
     </body>
     </html>

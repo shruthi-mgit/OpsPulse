@@ -41,31 +41,31 @@ class JWTService:
             True if successful, False otherwise
         """
         try:
-            # Check if JWT already exists
-            existing_jwt = await self.repository.find_by_user_id(user_id, schema)
-            
-            if existing_jwt:
-                # Update existing JWT
-                success = await self.repository.update(user_id, token, role, schema)
-                if success:
-                    logger.info(f"✅ JWT updated in schema: {schema} for user: {user_id}")
-                return success
-            else:
-                # Insert new JWT
-                jwt_id = await generate_prefixed_id(
+
+            # Always create a new JWT session
+            jwt_id = await generate_prefixed_id(
                 self.db_pool,
                 prefix="JWTKN_",
-                number_format="%014d",
+                number_format="%d",
                 sequence_name="jwt_id_seq",
-                schema="ik_payops_b1"
+                schema="ik_opspulse_b1"
             )
 
-                
-                success = await self.repository.save(jwt_id, user_id, token, role, schema)
-                if success:
-                    logger.info(f"✅ JWT stored in schema: {schema} for user: {user_id}")
-                return success
-                
+            success = await self.repository.save(
+                jwt_id=jwt_id,
+                user_id=user_id,
+                jwt_token=token,
+                role=role,
+                schema=schema
+            )
+
+            if success:
+                logger.info(
+                    f"✅ JWT stored in schema: {schema} for user: {user_id}"
+                )
+
+            return success
+
         except Exception as e:
             logger.error(f"❌ Error in store_or_update_jwt: {e}")
             return False
@@ -90,7 +90,7 @@ class JWTService:
         try:
             logger.info("💾 Saving JWT for GLOBAL schema (Super Admin)")
             
-            global_schema = "ik_payops_b1"
+            global_schema = "ik_opspulse_b1"
             
             # Check if JWT already exists
             existing_jwt = await self.repository.find_by_user_id(user_id, global_schema)
@@ -122,7 +122,7 @@ class JWTService:
     async def delete_jwt(
         self,
         token: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> bool:
         """
         Delete JWT by token (logout)
@@ -147,7 +147,7 @@ class JWTService:
     async def validate_and_get_user(
         self,
         token: str,
-        schema: str = "ik_payops_b1"
+        schema: str = "ik_opspulse_b1"
     ) -> Optional[dict]:
         """
         Validate token and return user details

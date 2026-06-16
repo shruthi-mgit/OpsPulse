@@ -76,13 +76,20 @@ class SapUserService:
                 schema_id,
                 branch,
                 branch_id,
+                is_password_changed,
                 created_at,
                 created_by,
                 updated_at,
                 updated_by
             )
             VALUES
-            ($1,$2,$3,$4,$5,$6,TRUE,$7,$8,$9,$10,NOW(),$11,NOW(),$12)
+            (
+                $1,$2,$3,$4,$5,$6,
+                TRUE,
+                $7,$8,$9,$10,
+                FALSE,
+                NOW(),$11,NOW(),$12
+            )
 
             ON CONFLICT (user_id)
             DO UPDATE SET

@@ -68,7 +68,7 @@ class UserService:
             # ==========================================================
             if role == "SuperAdmin":
 
-                system_schema = "ik_payops_b1"
+                system_schema = "ik_opspulse_b1"
 
                 token = JWTUtility.generate_token(
                     username=email,
@@ -99,7 +99,7 @@ class UserService:
             # ==========================================================
             company = await conn.fetchrow("""
                 SELECT is_active, is_approved
-                FROM ik_payops_b1.ik_onboarding_company
+                FROM ik_opspulse_b1.ik_onboarding_company
                 WHERE schema_id = $1
             """, schema_id)
 
@@ -273,7 +273,7 @@ class UserService:
 
             user = await conn.fetchrow("""
                 SELECT user_id
-                FROM ik_payops_b1.ik_global_users
+                FROM ik_opspulse_b1.ik_global_users
                 WHERE email=$1 AND is_active=TRUE
             """, email)
 
@@ -570,11 +570,15 @@ class TenantUserService:
                 DO $$
                 BEGIN
                     IF NOT EXISTS (
-                        SELECT 1 FROM pg_class
-                        WHERE relkind = 'S'
-                        AND relname = 'users_seq'
+                        SELECT 1
+                        FROM pg_class c
+                        JOIN pg_namespace n
+                            ON n.oid = c.relnamespace
+                        WHERE c.relkind = 'S'
+                        AND c.relname = 'users_seq'
+                        AND n.nspname = 'ik_opspulse_b1'
                     ) THEN
-                        CREATE SEQUENCE ik_payops_b1.users_seq START 1;
+                        CREATE SEQUENCE ik_opspulse_b1.users_seq START 1;
                     END IF;
                 END$$;
                 """)
@@ -584,25 +588,29 @@ class TenantUserService:
                 DO $$
                 BEGIN
                     IF NOT EXISTS (
-                        SELECT 1 FROM pg_class
-                        WHERE relkind = 'S'
-                        AND relname = 'global_user_seq'
+                        SELECT 1
+                        FROM pg_class c
+                        JOIN pg_namespace n
+                            ON n.oid = c.relnamespace
+                        WHERE c.relkind = 'S'
+                        AND c.relname = 'global_user_seq'
+                        AND n.nspname = 'ik_opspulse_b1'
                     ) THEN
-                        CREATE SEQUENCE ik_payops_b1.global_user_seq START 1;
+                        CREATE SEQUENCE ik_opspulse_b1.global_user_seq START 1;
                     END IF;
                 END$$;
                 """)
 
                 user_seq = await conn.fetchval(
-                    "SELECT nextval('ik_payops_b1.users_seq')"
+                    "SELECT nextval('ik_opspulse_b1.users_seq')"
                 )
 
                 guser_seq = await conn.fetchval(
-                    "SELECT nextval('ik_payops_b1.global_user_seq')"
+                    "SELECT nextval('ik_opspulse_b1.global_user_seq')"
                 )
 
-                user_id = f"USERS_{user_seq:014d}"
-                global_user_id = f"GUSER_{guser_seq:014d}"
+                user_id = f"USERS_{user_seq}"
+                global_user_id = f"GUSER_{guser_seq}"
     
                 raw_password = "User@123"
                 hashed_password = PasswordEncoder.hash_password(raw_password)
@@ -650,7 +658,7 @@ class TenantUserService:
                 # -----------------------------
                 await conn.execute(
                     """
-                    INSERT INTO ik_payops_b1.ik_global_users
+                    INSERT INTO ik_opspulse_b1.ik_global_users
                     (
                         global_user_id,
                         user_id,
@@ -692,7 +700,7 @@ class TenantUserService:
                         email_pwd,
                         smtp_server,
                         smtp_port
-                    FROM ik_payops_b1.ik_config
+                    FROM ik_opspulse_b1.ik_config
                     WHERE schema_id=$1
                     """,
                     tenant_schema,

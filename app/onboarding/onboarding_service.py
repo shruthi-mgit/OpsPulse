@@ -6,7 +6,7 @@ if getattr(sys, 'frozen', False):
 else:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-UPLOAD_ROOT = r"D:\PayOpsUploads"
+UPLOAD_ROOT = r"D:\OpsPulseUploads"
 os.makedirs(UPLOAD_ROOT, exist_ok=True)
 print("UPLOAD ROOT:", UPLOAD_ROOT)
 
@@ -22,7 +22,7 @@ import base64
 from app.scheduler.scheduler import trigger_single_tenant_sync
 
 
-GLOBAL_SCHEMA = "ik_payops_b1"
+GLOBAL_SCHEMA = "ik_opspulse_b1"
 
 
 
@@ -83,7 +83,7 @@ class OnboardingService:
 
                 exact_match = await conn.fetchrow("""
                     SELECT company_name
-                    FROM ik_payops_b1.ik_onboarding_company
+                    FROM ik_opspulse_b1.ik_onboarding_company
                     WHERE LOWER(TRIM(company_name)) = LOWER(TRIM($1))
                 """, company_name)
 
@@ -98,7 +98,7 @@ class OnboardingService:
 
                 seq_val = await OnboardingRepository.get_next_onboarding_seq(conn)
 
-                onboard_company_id = f"CMPNY_{seq_val:014d}"
+                onboard_company_id = f"CMPNY_{seq_val}"
 
                 # -------------------------
                 # Insert onboarding
@@ -121,7 +121,7 @@ class OnboardingService:
 
                 if role == "SuperAdmin" and created_by:
 
-                    tenant_schema = f"ik_po_c{seq_val:05d}"
+                    tenant_schema = f"ik_op_c{seq_val:05d}"
 
                     await create_tenant_schema(conn, tenant_schema)
 
@@ -132,11 +132,15 @@ class OnboardingService:
                     DO $$
                     BEGIN
                         IF NOT EXISTS (
-                            SELECT 1 FROM pg_class
-                            WHERE relkind = 'S'
-                            AND relname = 'users_seq'
+                            SELECT 1
+                            FROM pg_class c
+                            JOIN pg_namespace n
+                                ON n.oid = c.relnamespace
+                            WHERE c.relkind = 'S'
+                            AND c.relname = 'users_seq'
+                            AND n.nspname = 'ik_opspulse_b1'
                         ) THEN
-                            CREATE SEQUENCE ik_payops_b1.users_seq START 1;
+                            CREATE SEQUENCE ik_opspulse_b1.users_seq START 1;
                         END IF;
                     END$$;
                     """)
@@ -146,24 +150,28 @@ class OnboardingService:
                     DO $$
                     BEGIN
                         IF NOT EXISTS (
-                            SELECT 1 FROM pg_class
-                            WHERE relkind = 'S'
-                            AND relname = 'global_user_seq'
+                            SELECT 1
+                            FROM pg_class c
+                            JOIN pg_namespace n
+                                ON n.oid = c.relnamespace
+                            WHERE c.relkind = 'S'
+                            AND c.relname = 'global_user_seq'
+                            AND n.nspname = 'ik_opspulse_b1'
                         ) THEN
-                            CREATE SEQUENCE ik_payops_b1.global_user_seq START 1;
+                            CREATE SEQUENCE ik_opspulse_b1.global_user_seq START 1;
                         END IF;
                     END$$;
                     """)
                     user_seq = await conn.fetchval(
-                        "SELECT nextval('ik_payops_b1.users_seq')"
+                        "SELECT nextval('ik_opspulse_b1.users_seq')"
                     )
 
                     guser_seq = await conn.fetchval(
-                        "SELECT nextval('ik_payops_b1.global_user_seq')"
+                        "SELECT nextval('ik_opspulse_b1.global_user_seq')"
                     )
 
-                    tenant_admin_id = f"USERS_{user_seq:014d}"
-                    global_user_id = f"GUSER_{guser_seq:014d}"
+                    tenant_admin_id = f"USERS_{user_seq}"
+                    global_user_id = f"GUSER_{guser_seq}"
 
                     # -------------------------
                     # Tenant admin
@@ -205,10 +213,10 @@ class OnboardingService:
                     # -------------------------
 
                     config_seq = await conn.fetchval(
-                        "SELECT nextval('ik_payops_b1.config_seq')"
+                        "SELECT nextval('ik_opspulse_b1.config_seq')"
                     )
 
-                    config_id = f"CONFG_{config_seq:014d}"
+                    config_id = f"CONFG_{config_seq}"
 
                     await OnboardingRepository.insert_config(
                         conn,
@@ -327,7 +335,7 @@ class OnboardingService:
 
                 seq_val = int(onboard_company_id.split("_")[1])
 
-                tenant_schema = f"ik_po_c{seq_val:05d}"
+                tenant_schema = f"ik_op_c{seq_val:05d}"
 
                 await create_tenant_schema(conn, tenant_schema)
 
@@ -345,38 +353,45 @@ class OnboardingService:
                 DO $$
                 BEGIN
                     IF NOT EXISTS (
-                        SELECT 1 FROM pg_class
-                        WHERE relkind = 'S'
-                        AND relname = 'users_seq'
+                        SELECT 1
+                        FROM pg_class c
+                        JOIN pg_namespace n
+                            ON n.oid = c.relnamespace
+                        WHERE c.relkind = 'S'
+                        AND c.relname = 'users_seq'
+                        AND n.nspname = 'ik_opspulse_b1'
                     ) THEN
-                        CREATE SEQUENCE ik_payops_b1.users_seq START 1;
+                        CREATE SEQUENCE ik_opspulse_b1.users_seq START 1;
                     END IF;
                 END$$;
                 """)
-
-                # create global_user_seq if not exists
+                                # create global_user_seq if not exists
                 await conn.execute("""
                 DO $$
                 BEGIN
                     IF NOT EXISTS (
-                        SELECT 1 FROM pg_class
-                        WHERE relkind = 'S'
-                        AND relname = 'global_user_seq'
+                        SELECT 1
+                        FROM pg_class c
+                        JOIN pg_namespace n
+                            ON n.oid = c.relnamespace
+                        WHERE c.relkind = 'S'
+                        AND c.relname = 'global_user_seq'
+                        AND n.nspname = 'ik_opspulse_b1'
                     ) THEN
-                        CREATE SEQUENCE ik_payops_b1.global_user_seq START 1;
+                        CREATE SEQUENCE ik_opspulse_b1.global_user_seq START 1;
                     END IF;
                 END$$;
                 """)
                 user_seq = await conn.fetchval(
-                    "SELECT nextval('ik_payops_b1.users_seq')"
+                    "SELECT nextval('ik_opspulse_b1.users_seq')"
                 )
 
                 guser_seq = await conn.fetchval(
-                    "SELECT nextval('ik_payops_b1.global_user_seq')"
+                    "SELECT nextval('ik_opspulse_b1.global_user_seq')"
                 )
 
-                tenant_admin_id = f"USERS_{user_seq:014d}"
-                global_user_id = f"GUSER_{guser_seq:014d}"
+                tenant_admin_id = f"USERS_{user_seq}"
+                global_user_id = f"GUSER_{guser_seq}"
 
                 # -------------------------
                 # Insert tenant admin
@@ -417,10 +432,10 @@ class OnboardingService:
                 # -------------------------
 
                 config_seq = await conn.fetchval(
-                    "SELECT nextval('ik_payops_b1.config_seq')"
+                    "SELECT nextval('ik_opspulse_b1.config_seq')"
                 )
 
-                config_id = f"CONFG_{config_seq:014d}"
+                config_id = f"CONFG_{config_seq}"
 
                 await OnboardingRepository.insert_config(
                     conn,
@@ -577,39 +592,32 @@ class OnboardingService:
                 detail="Only Super Admin can update company"
             )
 
+        # ❌ DO NOT allow critical system fields
+        RESTRICTED_FIELDS = ["schema_id", "is_approved"]
+
+        # ✅ collect update fields
         data_dict = {
             k: v for k, v in data.dict(exclude_unset=True).items()
-            if v is not None and v != ""
+            if v is not None and v != "" and k not in RESTRICTED_FIELDS
         }
 
         if not data_dict:
             raise HTTPException(400, "No fields to update")
 
-        update_fields = []
-        values = []
-        index = 1
-
-        for key, value in data_dict.items():
-            update_fields.append(f"{key} = ${index}")
-            values.append(value)
-            index += 1
-
-        values.append(onboard_company_id)
-
-        query = f"""
-            UPDATE ik_payops_b1.ik_onboarding_company
-            SET {", ".join(update_fields)},
-                updated_at = NOW()
-            WHERE onboard_company_id = ${index}
-            RETURNING *
-        """
+        # ✅ clean company_name
+        if "company_name" in data_dict:
+            data_dict["company_name"] = data_dict["company_name"].strip()
 
         async with db_pool.acquire() as conn:
             async with conn.transaction():
 
+                # =========================
+                # GET EXISTING DATA
+                # =========================
                 existing = await conn.fetchrow(
                     """
-                    SELECT 1 FROM ik_payops_b1.ik_onboarding_company
+                    SELECT email, schema_id
+                    FROM ik_opspulse_b1.ik_onboarding_company
                     WHERE onboard_company_id = $1
                     """,
                     onboard_company_id
@@ -618,15 +626,134 @@ class OnboardingService:
                 if not existing:
                     raise HTTPException(404, "Company not found")
 
+                schema_id = existing["schema_id"]
+
+                # =========================
+                # BUILD UPDATE QUERY
+                # =========================
+                update_fields = []
+                values = []
+                index = 1
+
+                for key, value in data_dict.items():
+                    update_fields.append(f"{key} = ${index}")
+                    values.append(value)
+                    index += 1
+
+                values.append(onboard_company_id)
+
+                query = f"""
+                    UPDATE ik_opspulse_b1.ik_onboarding_company
+                    SET {", ".join(update_fields)},
+                        updated_at = NOW()
+                    WHERE onboard_company_id = ${index}
+                    RETURNING *
+                """
+
                 updated = await conn.fetchrow(query, *values)
+
+                # =========================
+                # GET USER_ID (COMMON LINK)
+                # =========================
+                user = await conn.fetchrow(
+                    """
+                    SELECT user_id
+                    FROM ik_opspulse_b1.ik_global_users
+                    WHERE schema_id = $1
+                    """,
+                    schema_id
+                )
+
+                if user:
+                    user_id = user["user_id"]
+
+                    # =========================
+                    # EMAIL SYNC
+                    # =========================
+                    if "email" in data_dict:
+                        await conn.execute(
+                            """
+                            UPDATE ik_opspulse_b1.ik_global_users
+                            SET email = $1
+                            WHERE user_id = $2
+                            """,
+                            data_dict["email"], user_id
+                        )
+
+                        await conn.execute(
+                            f"""
+                            UPDATE "{schema_id}".ik_users
+                            SET email = $1
+                            WHERE user_id = $2
+                            """,
+                            data_dict["email"], user_id
+                        )
+
+                    # =========================
+                    # COMPANY NAME SYNC
+                    # =========================
+                    if "company_name" in data_dict:
+                        await conn.execute(
+                            """
+                            UPDATE ik_opspulse_b1.ik_global_users
+                            SET company_name = $1
+                            WHERE user_id = $2
+                            """,
+                            data_dict["company_name"], user_id
+                        )
+
+                    # =========================
+                    # USER NAME SYNC
+                    # =========================
+                    if "user_name" in data_dict:
+                        first_name = data_dict["user_name"].split(" ")[0]
+                        last_name = " ".join(data_dict["user_name"].split(" ")[1:])
+
+                        await conn.execute(
+                            """
+                            UPDATE ik_opspulse_b1.ik_global_users
+                            SET first_name = $1, last_name = $2
+                            WHERE user_id = $3
+                            """,
+                            first_name, last_name, user_id
+                        )
+
+                        await conn.execute(
+                            f"""
+                            UPDATE "{schema_id}".ik_users
+                            SET first_name = $1, last_name = $2
+                            WHERE user_id = $3
+                            """,
+                            first_name, last_name, user_id
+                        )
+
+                    # =========================
+                    # MOBILE NUMBER SYNC
+                    # =========================
+                    if "user_phone_no" in data_dict:
+                        await conn.execute(
+                            """
+                            UPDATE ik_opspulse_b1.ik_global_users
+                            SET mobile_number = $1
+                            WHERE user_id = $2
+                            """,
+                            data_dict["user_phone_no"], user_id
+                        )
+
+                        await conn.execute(
+                            f"""
+                            UPDATE "{schema_id}".ik_users
+                            SET mobile_number = $1
+                            WHERE user_id = $2
+                            """,
+                            data_dict["user_phone_no"], user_id
+                        )
 
         return {
             "message": "Company updated successfully",
             "data": dict(updated)
         }
-
-
-    # ==================================================
+        # ==================================================
     # UPLOAD LOGO (SAVE FILE + STORE URL)
     # ==================================================
     @staticmethod
@@ -661,7 +788,7 @@ class OnboardingService:
         async with db_pool.acquire() as conn:
             await conn.execute(
                 """
-                UPDATE ik_payops_b1.ik_onboarding_company
+                UPDATE ik_opspulse_b1.ik_onboarding_company
                 SET company_logo = $1
                 WHERE onboard_company_id = $2
                 """,
@@ -721,7 +848,7 @@ class OnboardingService:
                 existing = await conn.fetchrow(
                     """
                     SELECT company_logo
-                    FROM ik_payops_b1.ik_onboarding_company
+                    FROM ik_opspulse_b1.ik_onboarding_company
                     WHERE onboard_company_id = $1
                     """,
                     onboard_company_id
@@ -738,7 +865,7 @@ class OnboardingService:
 
                 await conn.execute(
                     """
-                    UPDATE ik_payops_b1.ik_onboarding_company
+                    UPDATE ik_opspulse_b1.ik_onboarding_company
                     SET company_logo = $1,
                         updated_at = NOW()
                     WHERE onboard_company_id = $2

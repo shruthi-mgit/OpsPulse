@@ -63,3 +63,5 @@ class UpdateTenantUserRequest(BaseModel):
     role: str | None = None
     branch_id: str | None = None
     is_active: bool | None = None
+    email: str | None = None
+    branch: str | None = None

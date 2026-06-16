@@ -15,7 +15,7 @@ async def seed_super_admin(conn):
     # --------------------------------------------------
     existing = await conn.fetchrow("""
         SELECT 1
-        FROM ik_payops_b1.ik_global_users
+        FROM ik_opspulse_b1.ik_global_users
         WHERE email = 'prod.admin@ikyam.com'
     """)
 
@@ -32,11 +32,11 @@ async def seed_super_admin(conn):
     # Generate IDs
     # --------------------------------------------------
     seq_val = await conn.fetchval(
-        "SELECT nextval('ik_payops_b1.global_user_seq')"
+        "SELECT nextval('ik_opspulse_b1.global_user_seq')"
     )
 
-    global_id = f"GUSER_{seq_val:014d}"
-    super_user_id = f"SUPER_{seq_val:014d}"
+    global_id = f"GUSER_{seq_val}"
+    super_user_id = f"SUPER_{seq_val}"
 
     first_name = "Product"
     last_name = "Admin"
@@ -45,7 +45,7 @@ async def seed_super_admin(conn):
     # Insert SUPER_ADMIN into ik_global_users
     # --------------------------------------------------
     await conn.execute("""
-        INSERT INTO ik_payops_b1.ik_global_users
+        INSERT INTO ik_opspulse_b1.ik_global_users
         (
             global_user_id,
             user_id,
@@ -73,7 +73,7 @@ async def seed_super_admin(conn):
         hashed_password,
         "Ikyam Product",
         "8123332485",
-        "ik_payops_b1",
+        "ik_opspulse_b1",
         first_name,
         last_name,
         super_user_id,

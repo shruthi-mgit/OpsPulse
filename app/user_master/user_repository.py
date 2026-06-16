@@ -13,7 +13,7 @@ class TenantUserRepository:
         return await conn.fetchrow(
             """
             SELECT user_id
-            FROM ik_payops_b1.ik_global_users
+            FROM ik_opspulse_b1.ik_global_users
             WHERE email=$1
             """,
             email,
@@ -46,7 +46,7 @@ class TenantUserRepository:
         return await conn.fetchrow(
             """
             SELECT 1
-            FROM ik_payops_b1.ik_global_users
+            FROM ik_opspulse_b1.ik_global_users
             WHERE email=$1
             """,
             email,
@@ -110,7 +110,7 @@ class TenantUserRepository:
     @staticmethod
     async def update_global_user(conn, user_id, data_dict):
 
-        allowed_fields = ["first_name", "last_name", "mobile_number", "role"]
+        allowed_fields = ["first_name", "last_name","email", "mobile_number", "role"]
 
         update_fields = []
         values = []
@@ -128,7 +128,7 @@ class TenantUserRepository:
         values.append(user_id)
 
         query = f"""
-            UPDATE ik_payops_b1.ik_global_users
+            UPDATE ik_opspulse_b1.ik_global_users
             SET {", ".join(update_fields)},
                 updated_at = NOW()
             WHERE user_id = ${index}
@@ -173,7 +173,7 @@ class TenantUserRepository:
 
         await conn.execute(
             """
-            UPDATE ik_payops_b1.ik_global_users
+            UPDATE ik_opspulse_b1.ik_global_users
             SET is_active = $1,
                 updated_at = NOW()
             WHERE user_id = $2
@@ -202,7 +202,7 @@ class UserRepository:
                    schema_id,
                    is_password_changed,
                    is_active
-            FROM ik_payops_b1.ik_global_users
+            FROM ik_opspulse_b1.ik_global_users
             WHERE LOWER(email) = LOWER($1) AND is_active=TRUE
             """,
             email,
@@ -217,7 +217,7 @@ class UserRepository:
         return await conn.fetchrow(
             """
             SELECT user_id, schema_id
-            FROM ik_payops_b1.ik_global_users
+            FROM ik_opspulse_b1.ik_global_users
             WHERE user_id=$1
             """,
             user_id,
@@ -283,7 +283,7 @@ class UserRepository:
 
         await conn.execute(
             """
-            UPDATE ik_payops_b1.ik_global_users
+            UPDATE ik_opspulse_b1.ik_global_users
             SET password=$1,
                 is_password_changed=TRUE
             WHERE user_id=$2
@@ -300,7 +300,7 @@ class UserRepository:
 
         await conn.execute(
             """
-            UPDATE ik_payops_b1.ik_global_users
+            UPDATE ik_opspulse_b1.ik_global_users
             SET token=$1
             WHERE email=$2
             """,
@@ -317,7 +317,7 @@ class UserRepository:
         return await conn.fetchrow(
             """
             SELECT user_id, schema_id
-            FROM ik_payops_b1.ik_global_users
+            FROM ik_opspulse_b1.ik_global_users
             WHERE email=$1 AND token=$2
             """,
             email,
@@ -332,7 +332,7 @@ class UserRepository:
 
         await conn.execute(
             """
-            UPDATE ik_payops_b1.ik_global_users
+            UPDATE ik_opspulse_b1.ik_global_users
             SET token=NULL
             WHERE user_id=$1
             """,
@@ -385,7 +385,7 @@ class UserRepository:
 
         await conn.execute(
             """
-            UPDATE ik_payops_b1.ik_global_users
+            UPDATE ik_opspulse_b1.ik_global_users
             SET password=$1,
                 is_password_changed=FALSE
             WHERE user_id=$2
