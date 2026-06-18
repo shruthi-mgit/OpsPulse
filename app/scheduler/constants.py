@@ -10,5 +10,7 @@ ALLOWED_TYPES = [
     "IncomingPayment",
     "OutgoingPayment",
     "Notification",
+    "StockTransfer",
+    "InventoryTransferRequest",
     "GLOBAL_ERROR"
 ]

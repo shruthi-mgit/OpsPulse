@@ -808,11 +808,11 @@ async def create_tenant_schema(conn, tenant_schema: str):
 
             upi_status VARCHAR(20),
 
+            upi_url TEXT,
+
             upi_utr VARCHAR(50),
 
             upi_qr_ref VARCHAR(80),
-
-            merchant_tran_id VARCHAR(35),
 
             upi_confirmed_at TIMESTAMPTZ,
 

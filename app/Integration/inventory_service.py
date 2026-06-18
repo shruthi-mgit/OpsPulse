@@ -135,17 +135,19 @@ class InventoryService:
             whs_code
         )
 
-        if isinstance(data, dict):
-            rows = data.get("value", [])
-        else:
-            rows = data
+        rows = data.get("value", []) if isinstance(data, dict) else data
 
         filtered_rows = [
             row
             for row in rows
             if (
                 float(row.get("AvailableQty", 0))
-                - float(row.get("QuantityOut", 0))
+                - float(
+                    row.get(
+                        "QunatityOut",
+                        row.get("QuantityOut", 0)
+                    )
+                )
             ) > 0
         ]
 
@@ -562,6 +564,16 @@ class InventoryService:
                         sap_payload
                     )
 
+                    log_service = LogService(conn)
+
+                    await log_service.log_success(
+                        schema=tenant_schema,
+                        schema_id=tenant_schema,
+                        type="StockTransfer",
+                        msg=f"Stock Transfer Posted : {transfer_id}",
+                        payload=sap_payload
+                    )
+
                     print("===================================")
                     print("SAP STOCK TRANSFER RESPONSE")
                     print("===================================")
@@ -610,12 +622,7 @@ class InventoryService:
 
                 except Exception as e:
 
-                    print("===================================")
-                    print("SAP STOCK TRANSFER ERROR")
-                    print("===================================")
-                    print("ERROR TYPE:", type(e))
-                    print("ERROR:", repr(e))
-                    print("ERROR STRING:", str(e))
+                    error_msg = str(e)
 
                     await conn.execute(f"""
                         UPDATE
@@ -630,9 +637,30 @@ class InventoryService:
                         transfer_id
                     )
 
+                    try:
+
+                        async with db_pool.acquire() as log_conn:
+
+                            log_service = LogService(log_conn)
+
+                            await log_service.log_error(
+                                schema=tenant_schema,
+                                schema_id=tenant_schema,
+                                type="StockTransfer",
+                                msg=error_msg,
+                                payload=sap_payload
+                            )
+
+                    except Exception as log_ex:
+
+                        print(
+                            "LOGGING FAILED:",
+                            str(log_ex)
+                        )
+
                     raise HTTPException(
                         status_code=400,
-                        detail=f"SAP Stock Transfer Failed: {str(e)}"
+                        detail=f"SAP Stock Transfer Failed: {error_msg}"
                     )
     # =====================================
     # RECENT STOCK TRANSFERS
@@ -987,6 +1015,16 @@ class InventoryService:
                         data
                     )
 
+                    log_service = LogService(conn)
+
+                    await log_service.log_success(
+                        schema=tenant_schema,
+                        schema_id=tenant_schema,
+                        type="InventoryTransferRequest",
+                        msg=f"Inventory Transfer Request Posted : {itr_id}",
+                        payload=data
+                    )
+
                     print("SAP RESPONSE =", sap_response)
 
                     # SAP returned error object
@@ -1017,6 +1055,8 @@ class InventoryService:
 
                 except Exception as e:
 
+                    error_msg = str(e)
+
                     await conn.execute(f'''
                         UPDATE "{tenant_schema}".ik_itr_header
                         SET
@@ -1029,12 +1069,33 @@ class InventoryService:
                         itr_id
                     )
 
+                    try:
+
+                        async with db_pool.acquire() as log_conn:
+
+                            log_service = LogService(log_conn)
+
+                            await log_service.log_error(
+                                schema=tenant_schema,
+                                schema_id=tenant_schema,
+                                type="InventoryTransferRequest",
+                                msg=error_msg,
+                                payload=data
+                            )
+
+                    except Exception as log_ex:
+
+                        print(
+                            "LOGGING FAILED:",
+                            str(log_ex)
+                        )
+
                     raise HTTPException(
                         status_code=400,
                         detail={
                             "status": "error",
                             "itr_id": itr_id,
-                            "message": str(e)
+                            "message": error_msg
                         }
                     )
 

@@ -214,19 +214,29 @@ class SapPaymentService:
     # CUSTOMER INVOICES
     # =========================
     @staticmethod
-    async def get_invoices(customer_code: str, request, db_pool):
+    async def get_invoices(
+        customer_code: str,
+        bpl_id: int,
+        request,
+        db_pool
+    ):
         try:
             async with db_pool.acquire() as conn:
 
                 from app.config.config_service import get_sap_config_by_schema
+
                 tenant_schema = getattr(request.state, "schema")
 
                 config = await get_sap_config_by_schema(
                     conn,
                     tenant_schema
                 )
-                
-                data = await SAPApiClient.get_customer_due_invoices(customer_code, config)
+
+                data = await SAPApiClient.get_customer_due_invoices(
+                    customer_code=customer_code,
+                    bpl_id=bpl_id,
+                    config=config
+                )
 
                 formatted = [
                     {
@@ -247,7 +257,10 @@ class SapPaymentService:
             logger.exception("Error fetching invoices")
             raise HTTPException(
                 status_code=400,
-                detail={"status": "error", "message": f"Failed to fetch invoice data: {str(e)}"}
+                detail={
+                    "status": "error",
+                    "message": f"Failed to fetch invoice data: {str(e)}"
+                }
             )
 
     # =========================
@@ -504,8 +517,12 @@ class SapPaymentService:
     # SUPPLIER INVOICES
     # =========================
     @staticmethod
-    async def get_supplier_invoices(vendor_code: str, request, db_pool):
-
+    async def get_supplier_invoices(
+        vendor_code: str,
+        bpl_id: int,
+        request,
+        db_pool
+    ):
         try:
             from app.config.config_service import get_sap_config_by_schema
 
@@ -517,7 +534,11 @@ class SapPaymentService:
                     tenant_schema
                 )
 
-            data = await SAPApiClient.get_vendor_due_invoices(vendor_code, config)
+            data = await SAPApiClient.get_vendor_due_invoices(
+                vendor_code=vendor_code,
+                bpl_id=bpl_id,
+                config=config
+            )
 
             formatted = [
                 {
@@ -538,7 +559,10 @@ class SapPaymentService:
             logger.exception("Error fetching vendor invoices")
             raise HTTPException(
                 status_code=400,
-                detail={"status": "error", "message": "Failed to fetch vendor data"}
+                detail={
+                    "status": "error",
+                    "message": "Failed to fetch vendor data"
+                }
             )
     # =========================
     # BRANCHES
@@ -1067,7 +1091,7 @@ class SapPaymentService:
                         schema_id=tenant_schema,
                         type="IncomingPayment",
                         msg=f"Incoming Payment Posted : {payment_id}",
-                        payload=sap_res
+                        payload=sap_payload
                     )
                     
 
@@ -2238,22 +2262,6 @@ class SapPaymentService:
                     "message": f"Failed to fetch GL Master: {str(e)}"
                 }
             )
-    # @staticmethod
-    # async def get_outgoing_gl_accounts(
-    #     conn,
-    #     tenant_schema: str
-    # ):
-
-    #     config = await get_sap_config_by_schema(
-    #         conn,
-    #         tenant_schema
-    #     )
-
-    #     rows = await SAPApiClient.get_outgoing_gl_accounts(
-    #         config
-    #     )
-
-    #     return success_response(rows)
     
     @staticmethod
     async def get_merchant_mapping(
@@ -2335,6 +2343,7 @@ class SapPaymentService:
                     bank_amount,
                     schema_id,
                     upi_status,
+                    upi_url,
                     upi_utr,
                     upi_qr_ref,
                     upi_confirmed_at,
@@ -2359,6 +2368,7 @@ class SapPaymentService:
                     "bank_amount": float(r["bank_amount"]) if r["bank_amount"] is not None else None,
                     "schema_id": r["schema_id"],
                     "upi_status": r["upi_status"],
+                    "upi_url": r["upi_url"],      
                     "upi_utr": r["upi_utr"],
                     "upi_qr_ref": r["upi_qr_ref"],
                     "upi_confirmed_at": r["upi_confirmed_at"].isoformat() if r["upi_confirmed_at"] else None,
@@ -2407,6 +2417,7 @@ class SapPaymentService:
                 "transfer_date",
                 "bank_amount",
                 "upi_status",
+                "upi_url",
                 "upi_utr",
                 "upi_qr_ref",
                 "upi_confirmed_at",
@@ -2458,6 +2469,7 @@ class SapPaymentService:
                     bank_amount,
                     schema_id,
                     upi_status,
+                    upi_url,
                     upi_utr,
                     upi_qr_ref,
                     upi_confirmed_at,
@@ -2491,6 +2503,7 @@ class SapPaymentService:
                     "bank_amount": float(r["bank_amount"]) if r["bank_amount"] is not None else None,
                     "schema_id": r["schema_id"],
                     "upi_status": r["upi_status"],
+                    "upi_url": r["upi_url"],      
                     "upi_utr": r["upi_utr"],
                     "upi_qr_ref": r["upi_qr_ref"],
                     "upi_confirmed_at": r["upi_confirmed_at"].isoformat() if r["upi_confirmed_at"] else None,
@@ -2548,6 +2561,16 @@ class SapPaymentService:
                     config,
                     payload
                 )
+
+                log_service = LogService(conn)
+
+                await log_service.log_success(
+                    schema=tenant_schema,
+                    schema_id=tenant_schema,
+                    type="IncomingPayment",
+                    msg=f"Incoming Payment Posted : {payment_id}",
+                    payload=payload
+                )
                 if payment_id:
 
                     await conn.execute(
@@ -2583,64 +2606,44 @@ class SapPaymentService:
             raise
  
         except Exception as e:
- 
-            error_msg = extract_sap_error(str(e))
- 
-            logger.exception("Error creating incoming payment in SAP")
- 
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "status": "error",
-                    "message": error_msg
-                }
+
+            error_msg = str(e)
+
+            if payment_id:
+
+                await conn.execute(
+                    f"""
+                    UPDATE "{tenant_schema}".ik_inc_payment_header
+                    SET
+                        sap_status='Failed',
+                        updated_at=NOW()
+                    WHERE payment_id=$1
+                    """,
+                    payment_id
+                )
+
+            try:
+
+                async with db_pool.acquire() as log_conn:
+
+                    log_service = LogService(log_conn)
+
+                    await log_service.log_error(
+                        schema=tenant_schema,
+                        schema_id=tenant_schema,
+                        type="IncomingPayment",
+                        msg=error_msg,
+                        payload=payload
+                    )
+
+            except Exception as log_ex:
+
+                print("LOGGING FAILED:", str(log_ex))
+
+            raise Exception(
+                extract_sap_error(error_msg)
             )
 
-    # @staticmethod
-    # async def create_incoming_payment_sap(
-    #     request,
-    #     payload: dict,
-    #     db_pool,
-    #     current_user: dict
-    # ):
-    
-    #     try:
-
-    #         async with db_pool.acquire() as conn:
-
-    #             tenant_schema = (
-    #                 getattr(request.state, "schema", None)
-    #                 or current_user.get("company_schema")
-    #             )
-
-    #             config = await get_sap_config_by_schema(
-    #                 conn,
-    #                 tenant_schema
-    #             )
-
-    #             # Pass UI payload directly to SAP
-    #             sap_response = await SAPApiClient.post_incoming_payment(
-    #                 config,
-    #                 payload
-    #             )
-
-    #             return {
-    #                 "status": "success",
-    #                 "message": "Incoming payment created successfully",
-    #                 "sap_request": payload,
-    #                 "sap_response": sap_response
-    #             }
-
-    #     except Exception as e:
-
-    #         raise HTTPException(
-    #             status_code=400,
-    #             detail={
-    #                 "status": "error",
-    #                 "message": extract_sap_error(str(e))
-    #             }
-    #         )
-    
     # =========================
 
     # CREATE INCOMING PAYMENT (SAVE TO DB ONLY)
@@ -2721,7 +2724,12 @@ class SapPaymentService:
                         payments = payload.get("payments", {})
 
                         cash = payments.get("cash", {})
-                        transfer = payments.get("transfer", {})
+                        transfer = (
+                            payments.get("transfer")
+                            or payments.get("upi")
+                            or {}
+                        )
+
 
                         doc_total = (
                             float(
@@ -2790,12 +2798,14 @@ class SapPaymentService:
                         payload.get("BPLName")
                         or payload.get("branch_name")
                     )
-                    doc_type = payload.get("DocType")
-
-                    if doc_type == "rAccount":
-                        payment_type = "Account"
-                    else:
-                        payment_type = "Customer"
+                    payment_type = (
+                        payload.get("payment_type")
+                        or (
+                            "Account"
+                            if payload.get("DocType") == "rAccount"
+                            else "Customer"
+                        )
+                    )
 
                     if payment_type == "Customer":
                         customer_name_value = customer_name
@@ -2819,8 +2829,13 @@ class SapPaymentService:
                             transfer_date,
                             "%Y-%m-%d"
                         ).date()
-                    control_account_id = payload.get("control_account_id")
-                    # -------------------------
+                    is_pay_onaccount = bool(
+                        payload.get("is_payment_onaccount", False)
+                    )
+
+                    control_account_id = (
+                        payload.get("control_account_id")
+                    )
 
                     # INSERT HEADER
 
@@ -2836,6 +2851,8 @@ class SapPaymentService:
                             payment_type,
                             mode_of_payment,
                             remarks,
+                            is_pay_onaccount,
+                            control_account_id,
                             status,
                             sap_status,
                             created_by,
@@ -2848,9 +2865,11 @@ class SapPaymentService:
                         VALUES
                         (
                             $1,$2,$3,$4,$5,$6,$7,
+                            $8,
+                            $9,
                             'Draft',
                             'Pending',
-                            $8,$8,$9,$10,$11,$12
+                            $10,$10,$11,$12,$13,$14
                         )
                     ''',
 
@@ -2859,10 +2878,11 @@ class SapPaymentService:
                         card_code,
                         customer_name_value,
                         payment_type,
-
-                        payload.get("U_MDP") or None,   # <-- ADD THIS
-
+                        payload.get("U_MDP") or None,
                         remarks,
+
+                        is_pay_onaccount,
+                        control_account_id,
 
                         user_id,
                         tenant_schema,
@@ -3043,7 +3063,12 @@ class SapPaymentService:
                     payments = payload.get("payments", {})
 
                     cash = payments.get("cash", {})
-                    transfer = payments.get("transfer", {})
+
+                    transfer = (
+                        payments.get("transfer")
+                        or payments.get("upi")
+                        or {}
+                    )
 
                     cash_account = (
                         cash.get("account_id")
@@ -3062,6 +3087,9 @@ class SapPaymentService:
                         or payload.get("TransferAccount")
                     )
 
+                    print("PAYMENTS =", payments)
+                    print("TRANSFER =", transfer)
+                    print("BANK_ACCOUNT =", bank_account)
                     bank_amount = float(
                         transfer.get("amount")
                         or transfer.get("total_amount")
@@ -3435,3 +3463,318 @@ class SapPaymentService:
                     "message": f"Failed to fetch House Bank Accounts: {str(e)}"
                 }
             )
+
+    @staticmethod
+    async def process_pending_upi_payments(
+        request,
+        db_pool,
+        current_user
+    ):
+        async with db_pool.acquire() as conn:
+
+            tenant_schema = (
+                getattr(request.state, "schema", None)
+                or current_user.get("company_schema")
+            )
+
+            rows = await conn.fetch(f"""
+                SELECT h.payment_id
+                FROM "{tenant_schema}".ik_inc_payment_header h
+                INNER JOIN "{tenant_schema}".ik_inc_payment_paymeans_line p
+                    ON h.payment_id = p.payment_id
+                WHERE
+                    p.upi_status = 'SUCCESS'
+                    AND h.sap_status = 'Pending'
+            """)
+
+            for row in rows:
+
+                payment_id = row["payment_id"]
+
+                try:
+
+                    # Build SAP payload from DB
+                    payload = await SapPaymentService.create_incoming_db_sap(
+                        conn,
+                        tenant_schema,
+                        payment_id
+                    )
+
+                    # Post to SAP
+                    await SapPaymentService.create_incoming_payment_sap(
+                        request=request,
+                        payload=payload,
+                        db_pool=db_pool,
+                        current_user=current_user
+                    )
+
+                except Exception as e:
+
+                    await SapPaymentService.log_scheduler_error(
+                        conn,
+                        tenant_schema,
+                        payment_id,
+                        payload if 'payload' in locals() else {},
+                        str(e)
+                    )
+
+                    continue
+
+    @staticmethod
+    async def log_scheduler_error(
+        conn,
+        tenant_schema,
+        payment_id,
+        payload,
+        error
+    ):
+
+        error_id = await generate_error_id(
+            conn,
+            tenant_schema
+        )
+
+        await conn.execute(
+            f"""
+            INSERT INTO "{tenant_schema}".ik_error
+            (
+                error_id,
+                schema_id,
+                type,
+                error_desc,
+                json
+            )
+            VALUES
+            (
+                $1,$2,$3,$4,$5
+            )
+            """,
+            error_id,
+            tenant_schema,
+            "IncomingPaymentSAP",
+            f"Payment ID {payment_id} : {extract_sap_error(error)}",
+            json.dumps(payload, default=str)
+        )
+
+        await conn.execute(
+            f"""
+            UPDATE "{tenant_schema}".ik_inc_payment_header
+            SET
+                sap_status = 'Failed',
+                updated_at = NOW()
+            WHERE payment_id = $1
+            """,
+            payment_id
+        )
+
+    @staticmethod
+    async def build_sap_payload_from_db(
+        conn,
+        tenant_schema: str,
+        payment_id: str
+    ):
+
+        header = await conn.fetchrow(
+            f"""
+            SELECT *
+            FROM "{tenant_schema}".ik_inc_payment_header
+            WHERE payment_id = $1
+            """,
+            payment_id
+        )
+
+        if not header:
+            raise Exception(
+                f"Incoming payment not found: {payment_id}"
+            )
+
+        invoice_rows = await conn.fetch(
+            f"""
+            SELECT *
+            FROM "{tenant_schema}".ik_inc_payment_inv_line
+            WHERE payment_id = $1
+            """,
+            payment_id
+        )
+
+        account_rows = await conn.fetch(
+            f"""
+            SELECT *
+            FROM "{tenant_schema}".ik_inc_payment_acct_line
+            WHERE payment_id = $1
+            """,
+            payment_id
+        )
+
+        paymeans = await conn.fetchrow(
+            f"""
+            SELECT *
+            FROM "{tenant_schema}".ik_inc_payment_paymeans_line
+            WHERE payment_id = $1
+            LIMIT 1
+            """,
+            payment_id
+        )
+
+        payment_date = header["payment_date"]
+
+        is_on_account = bool(
+            header["is_pay_onaccount"]
+        )
+
+        payment_type = (
+            header["payment_type"]
+            or "Customer"
+        )
+
+        invoice_type_map = {
+            "A/R Invoice": "it_Invoice",
+            "Invoice": "it_Invoice",
+            "A/R Credit Memo": "it_CredItnote",
+            "Credit Memo": "it_CredItnote",
+            "AR Down Payment": "it_DownPayment",
+            "Down Payment": "it_DownPayment"
+        }
+
+        # ==========================================
+        # ACCOUNT PAYMENT
+        # ==========================================
+        if payment_type == "Account":
+
+            payload = {
+                "DocType": "rAccount",
+                "DocDate": payment_date.strftime("%Y-%m-%d"),
+                "TaxDate": payment_date.strftime("%Y-%m-%d"),
+                "DueDate": payment_date.strftime("%Y-%m-%d"),
+                "BPLID": (
+                    int(header["branch_id"])
+                    if header["branch_id"]
+                    else None
+                ),
+                "CounterReference": payment_id,
+                "Remarks": header["remarks"] or "",
+                "U_MDP": (
+                    header["mode_of_payment"]
+                    or "BankTransfer"
+                )
+            }
+
+            payload["PaymentAccounts"] = [
+                {
+                    "AccountCode": row["account_id"],
+                    "SumPaid": float(
+                        row["total_amount"] or 0
+                    )
+                }
+                for row in account_rows
+            ]
+
+        # ==========================================
+        # CUSTOMER PAYMENT
+        # ==========================================
+        else:
+
+            payload = {
+                "DocType": "rCustomer",
+                "DocDate": payment_date.strftime("%Y-%m-%d"),
+                "TaxDate": payment_date.strftime("%Y-%m-%d"),
+                "DueDate": payment_date.strftime("%Y-%m-%d"),
+                "CardCode": header["customer_id"],
+                "CardName": header["customer_name"],
+                "BPLID": (
+                    int(header["branch_id"])
+                    if header["branch_id"]
+                    else None
+                ),
+                "BPLName": header["branch"],
+                "CounterReference": payment_id,
+                "Remarks": header["remarks"] or "",
+                "U_MDP": (
+                    header["mode_of_payment"]
+                    or "UPI"
+                )
+            }
+
+            # ======================================
+            # CUSTOMER ON ACCOUNT
+            # ======================================
+            if is_on_account:
+
+                payload["PaymentInvoices"] = []
+
+                if header["control_account_id"]:
+
+                    payload["ControlAccount"] = (
+                        header["control_account_id"]
+                    )
+
+            # ======================================
+            # CUSTOMER INVOICE PAYMENT
+            # ======================================
+            else:
+
+                payload["PaymentInvoices"] = [
+                    {
+                        "DocEntry": int(
+                            row["doc_entry"]
+                        ),
+                        "SumApplied": float(
+                            row["total_amount"] or 0
+                        ),
+                        "InvoiceType": (
+                            row["doc_type"]
+                            if str(row["doc_type"]).startswith("it_")
+                            else invoice_type_map.get(
+                                str(row["doc_type"]).strip(),
+                                "it_Invoice"
+                            )
+                        )
+                    }
+                    for row in invoice_rows
+                ]
+
+        # ==========================================
+        # PAYMENT MEANS
+        # ==========================================
+        if paymeans:
+
+            payload["TransferAccount"] = (
+                paymeans["bank_account"]
+            )
+
+            payload["TransferSum"] = float(
+                paymeans["bank_amount"] or 0
+            )
+
+            payload["TransferDate"] = (
+                paymeans["transfer_date"].strftime("%Y-%m-%d")
+                if paymeans["transfer_date"]
+                else payment_date.strftime("%Y-%m-%d")
+            )
+
+            payload["TransferReference"] = (
+                paymeans["upi_utr"] or ""
+            )
+
+            payload["U_IKQRUTR"] = (
+                paymeans["upi_utr"] or ""
+            )
+
+            payload["U_IKQRDE"] = (
+                paymeans["upi_qr_ref"]
+                or payment_id
+            )
+
+        print("=" * 100)
+        print("PAYMENT ID =", payment_id)
+        print(
+            "SAP PAYLOAD =",
+            json.dumps(
+                payload,
+                indent=4,
+                default=str
+            )
+        )
+        print("=" * 100)
+
+        return payload

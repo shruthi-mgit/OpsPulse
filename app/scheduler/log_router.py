@@ -18,7 +18,7 @@ async def get_success_logs(
     role = current_user.get("role")
 
     # 🔴 ONLY ADMIN
-    if role != "Admin":
+    if role != "Finance":
         raise HTTPException(403, "Only Admin can view logs")
 
     async with pool.acquire() as conn:
@@ -44,7 +44,7 @@ async def get_error_logs(
     role = current_user.get("role")
 
     
-    if role != "Admin":
+    if role != "Finance":
         raise HTTPException(403, "Only Admin can view logs")
 
     async with pool.acquire() as conn:

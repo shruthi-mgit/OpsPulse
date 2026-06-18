@@ -118,9 +118,22 @@ class SAPApiClient:
                     cookies=cookies
                 )
 
-            r.raise_for_status()
+            if r.status_code >= 400:
 
-            data = r.json()
+                print("\n========== SAP ERROR ==========")
+                print("URL:", url)
+                print("STATUS:", r.status_code)
+                print("BODY:", r.text)
+                print("===============================\n")
+
+                r.raise_for_status()
+
+            try:
+                data = r.json()
+            except Exception:
+                print("Invalid JSON Response:")
+                print(r.text)
+                raise
 
             all_data.extend(
                 data.get("value", [])
@@ -137,7 +150,7 @@ class SAPApiClient:
                 next_endpoint = None
 
         return all_data
-        # =========================
+    # =========================
     # STREAM PAGINATION
     # =========================
     @staticmethod
@@ -310,16 +323,68 @@ class SAPApiClient:
         whs_code: str
     ):
 
-        query = (
-            "SQLQueries('SerialDetails')/List"
-            f"?ItemCode='{item_code}'"
-            f"&WhsCode='{whs_code}'"
+        endpoint = (
+            f"sml.svc/IK_SERIALDETAILSParameters("
+            f"P_ITEMCODE='{item_code}',"
+            f"P_WHSCODE='{whs_code}'"
+            f")/IK_SERIALDETAILS"
         )
 
-        return await SAPApiClient.get_all_data(
-            query,
-            config
-        )
+        base_url = config["base_url"]
+
+        cookies = await SAPApiClient.login(config)
+
+        all_data = []
+        skip = 0
+
+        while True:
+
+            url = f"{base_url}/{endpoint}?$skip={skip}"
+
+            print("SAP URL =>", url)
+
+            r = await SAPApiClient.client.get(
+                url,
+                cookies=cookies
+            )
+
+            if r.status_code == 401:
+
+                await delete_session(
+                    config["user_id"],
+                    config["schema_id"]
+                )
+
+                cookies = await SAPApiClient.login(config)
+
+                r = await SAPApiClient.client.get(
+                    url,
+                    cookies=cookies
+                )
+
+            if r.status_code >= 400:
+
+                print("SAP ERROR =>", r.text)
+                break
+
+            data = r.json()
+
+            rows = data.get("value", [])
+
+            if not rows:
+                break
+
+            all_data.extend(rows)
+
+            print(f"Fetched {len(rows)} records")
+
+            # stop when last page received
+            if len(rows) < 20:
+                break
+
+            skip += 20
+
+        return all_data
 
 
     @staticmethod
@@ -350,21 +415,27 @@ class SAPApiClient:
         )
 
     @staticmethod
-    async def get_customer_due_invoices(customer_code: str, config: dict):
-
-
+    async def get_customer_due_invoices(
+        customer_code: str,
+        bpl_id: int,
+        config: dict
+    ):
         base_url = config["base_url"]
-        endpoint = f"sml.svc/IK_CUSTOMER_BALANCEDUEParameters(P_CUSTOMERCODE='{customer_code}')/IK_CUSTOMER_BALANCEDUE"
+
+        endpoint = (
+            f"sml.svc/"
+            f"IK_CUSTOMER_BALANCEDUEParameters("
+            f"P_CUSTOMERCODE='{customer_code}',"
+            f"P_BPLID={bpl_id}"
+            f")/IK_CUSTOMER_BALANCEDUE"
+        )
 
         all_data = []
 
         cookies = await SAPApiClient.login(config)
 
         while endpoint:
-
             url = f"{base_url}/{endpoint}"
-
-            
 
             r = await SAPApiClient.client.get(
                 url,
@@ -372,14 +443,12 @@ class SAPApiClient:
             )
 
             if r.status_code == 500:
-
                 await delete_session(
                     config["user_id"],
                     config["schema_id"]
                 )
 
                 cookies = await SAPApiClient.login(config)
-
                 continue
 
             r.raise_for_status()
@@ -390,10 +459,11 @@ class SAPApiClient:
             next_link = data.get("@odata.nextLink")
 
             if next_link:
-                if not next_link.startswith("sml.svc"):
-                    endpoint = "sml.svc/" + next_link
-                else:
-                    endpoint = next_link
+                endpoint = (
+                    next_link
+                    if next_link.startswith("sml.svc")
+                    else f"sml.svc/{next_link}"
+                )
             else:
                 endpoint = None
 
@@ -403,11 +473,20 @@ class SAPApiClient:
     # VENDOR APIs
     # =========================
     @staticmethod
-    async def get_vendor_due_invoices(vendor_code: str, config: dict):
-
-
+    async def get_vendor_due_invoices(
+        vendor_code: str,
+        bpl_id: int,
+        config: dict
+    ):
         base_url = config["base_url"]
-        endpoint = f"sml.svc/IK_VENDOR_BALANCEDUEParameters(P_VENDORCODE='{vendor_code}')/IK_VENDOR_BALANCEDUE"
+
+        endpoint = (
+            f"sml.svc/"
+            f"IK_VENDOR_BALANCEDUEParameters("
+            f"P_VENDORCODE='{vendor_code}',"
+            f"P_BPLID={bpl_id}"
+            f")/IK_VENDOR_BALANCEDUE"
+        )
 
         all_data = []
 
@@ -417,22 +496,18 @@ class SAPApiClient:
 
             url = f"{base_url}/{endpoint}"
 
-            
-
             r = await SAPApiClient.client.get(
                 url,
                 cookies=cookies
             )
 
             if r.status_code == 401:
-
                 await delete_session(
                     config["user_id"],
                     config["schema_id"]
                 )
 
                 cookies = await SAPApiClient.login(config)
-
                 continue
 
             r.raise_for_status()
@@ -443,10 +518,11 @@ class SAPApiClient:
             next_link = data.get("@odata.nextLink")
 
             if next_link:
-                if not next_link.startswith("sml.svc"):
-                    endpoint = "sml.svc/" + next_link
-                else:
-                    endpoint = next_link
+                endpoint = (
+                    next_link
+                    if next_link.startswith("sml.svc")
+                    else f"sml.svc/{next_link}"
+                )
             else:
                 endpoint = None
 

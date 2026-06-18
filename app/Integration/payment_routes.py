@@ -48,21 +48,21 @@ async def get_customers(
 # =========================
 # GET INVOICES
 # =========================
-@router.get("/customer/{customer_code}/invoices")
+@router.get("/customer/{customer_code}/invoices/{bpl_id}")
 async def get_invoices(
     customer_code: str,
+    bpl_id: int,
     request: Request,
-    db_pool = Depends(get_db_pool)
+    db_pool=Depends(get_db_pool)
 ):
-
     check_finance_access(request)
 
     return await SapPaymentService.get_invoices(
         customer_code,
+        bpl_id,
         request,
         db_pool
     )
-
 
 # =========================
 # GET GL ACCOUNTS
@@ -128,21 +128,21 @@ async def get_suppliers(
             page=page,
             per_page=per_page
         )
-
-@router.get("/supplier/{supplier_code}/invoices")
+@router.get("/supplier/{supplier_code}/invoices/{bpl_id}")
 async def get_supplier_invoices(
     supplier_code: str,
-    request: Request,                         
-    pool = Depends(get_db_pool),             
+    bpl_id: int,
+    request: Request,
+    pool=Depends(get_db_pool),
     current_user: dict = Depends(get_current_user)
 ):
-
-    check_finance_access(request)            
+    check_finance_access(request)
 
     return await SapPaymentService.get_supplier_invoices(
         supplier_code,
+        bpl_id,
         request,
-        pool                                 
+        pool
     )
 
 @router.get("/branches")

@@ -88,11 +88,10 @@ class LogService:
             query = f"""
                 SELECT 
                     success_id,
-                    schema_id,
                     executed_at,
                     type,
-                    last_sync_at,
-                    success_desc
+                    success_desc,
+                    json
                 FROM "{schema}".ik_success
             """
 
@@ -115,9 +114,12 @@ class LogService:
 
             return success_response([dict(r) for r in rows])
 
-        except Exception:
-            logger.exception("Error fetching success logs")
-            raise HTTPException(500, "Failed to fetch success logs")
+        except Exception as e:
+            logger.exception("Scheduler jobs failed")
+            raise HTTPException(
+                status_code=500,
+                detail=str(e)
+            )
 
     # =========================
     # GET ERROR LOGS (READ)
@@ -133,10 +135,10 @@ class LogService:
             query = f"""
                 SELECT 
                     error_id,
-                    schema_id,
                     executed_at,
                     type,
-                    error_desc
+                    error_desc,
+                    json
                 FROM "{schema}".ik_error
             """
 
@@ -159,10 +161,12 @@ class LogService:
 
             return success_response([dict(r) for r in rows])
 
-        except Exception:
-            logger.exception("Error fetching error logs")
-            raise HTTPException(500, "Failed to fetch error logs")
-
+        except Exception as e:
+            logger.exception("Scheduler jobs failed")
+            raise HTTPException(
+                status_code=500,
+                detail=str(e)
+            )
     async def get_scheduler_jobs(
         self,
         schema: str,
@@ -180,23 +184,43 @@ class LogService:
             # BASE QUERY (UNION BOTH)
             # =========================
             base_query = f"""
-                SELECT 
+                SELECT
                     type AS job_name,
                     last_sync_at AS last_sync,
                     executed_at,
                     success_desc AS message,
                     'Success' AS status
                 FROM "{schema}".ik_success
+                WHERE type IN (
+                    'Branch',
+                    'Bank',
+                    'GLAccounts',
+                    'Warehouse',
+                    'Bin',
+                    'MerchantID',
+                    'Item',
+                    'BusinessPartner'
+                )
 
                 UNION ALL
 
-                SELECT 
-                    module AS job_name,   -- ✅ FIX
+                SELECT
+                    type AS job_name,
                     NULL AS last_sync,
                     executed_at,
                     error_desc AS message,
                     'Failed' AS status
                 FROM "{schema}".ik_error
+                WHERE type IN (
+                    'Branch',
+                    'Bank',
+                    'GLAccounts',
+                    'Warehouse',
+                    'Bin',
+                    'MerchantID',
+                    'Item',
+                    'BusinessPartner'
+                )
             """
 
             conditions = []
@@ -230,7 +254,7 @@ class LogService:
             # FINAL QUERY
             # =========================
 
-            final_query = f"SELECT * FROM ({base_query}) AS logs"
+            final_query = f"SELECT * FROM ({base_query}) AS latest_logs"
 
             if conditions:
                 final_query += " WHERE " + " AND ".join(conditions)
@@ -262,4 +286,4 @@ class LogService:
             }
 
         except Exception as e:
-            raise HTTPException(500, f"Failed to fetch scheduler jobs: {str(e)}")
+            raise HTTPException(400, f"Failed to fetch scheduler jobs: {str(e)}")

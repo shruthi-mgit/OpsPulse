@@ -8,6 +8,12 @@ from app.Integration.b1_master import SapMasterService
 from app.Integration.b1_bp import SapBPService
 from app.Integration.sap_api_client import SAPApiClient
 from app.config.config_service import get_sap_config_by_schema
+from app.Integration.payment_service import SapPaymentService
+import json
+from app.Integration.payment_service import (
+    generate_error_id,
+    extract_sap_error
+)
 
 
 logger = logging.getLogger(__name__)
@@ -356,8 +362,7 @@ async def sync_one_tenant(conn, schema_id):
             )
         await sync_item() 
         await sync_bp()
-
-
+     
 
     except Exception as e:
 
@@ -373,6 +378,253 @@ async def sync_one_tenant(conn, schema_id):
             "GLOBAL_ERROR",
             str(e)
         )
+
+async def process_pending_upi_payments(db_pool):
+
+    print("=" * 60)
+    print("UPI TO SAP POSTING STARTED")
+    print("=" * 60)
+
+    async with db_pool.acquire() as conn:
+
+        tenants = await get_tenants(conn)
+
+    for tenant in tenants:
+
+        schema_id = tenant["schema_id"]
+
+        async with db_pool.acquire() as conn:
+
+            rows = await conn.fetch(
+                f"""
+                SELECT DISTINCT h.payment_id
+                FROM "{schema_id}".ik_inc_payment_header h
+                INNER JOIN "{schema_id}".ik_inc_payment_paymeans_line p
+                    ON h.payment_id = p.payment_id
+                WHERE
+                    h.status = 'Draft'
+                    AND h.sap_status = 'Pending'
+                    AND p.upi_status = 'SUCCESS'
+                """
+            )
+
+            if not rows:
+                continue
+
+            print(
+                f"FOUND {len(rows)} PAYMENTS FOR {schema_id}"
+            )
+
+            # Load config once per tenant
+            config = await get_sap_config_by_schema(
+                conn,
+                schema_id
+            )
+
+            for row in rows:
+
+                payment_id = row["payment_id"]
+
+                try:
+
+                    print(
+                        f"PROCESSING PAYMENT : {payment_id}"
+                    )
+
+                    payload = await SapPaymentService.build_sap_payload_from_db(
+                        conn,
+                        schema_id,
+                        payment_id
+                    )
+
+                    print("=" * 100)
+                    print(
+                        "SAP PAYLOAD =",
+                        json.dumps(payload, indent=4, default=str)
+                    )
+                    print("=" * 100)
+
+                    sap_response = await SAPApiClient.post_incoming_payment(
+                        config,
+                        payload
+                    )
+
+                    print(
+                        "SAP RESPONSE =",
+                        sap_response
+                    )
+
+                    await conn.execute(
+                        f"""
+                        UPDATE "{schema_id}".ik_inc_payment_header
+                        SET
+                            status='Close',
+                            sap_status='Posted',
+                            sap_docentry=$1,
+                            sap_docnum=$2,
+                            updated_at=NOW()
+                        WHERE payment_id=$3
+                        """,
+                        str(sap_response.get("DocEntry")),
+                        str(sap_response.get("DocNum")),
+                        payment_id
+                    )
+
+                    print(
+                        f"PAYMENT POSTED SUCCESSFULLY : {payment_id}"
+                    )
+
+                except Exception as e:
+
+                    print(
+                        f"PAYMENT FAILED : {payment_id}"
+                    )
+
+                    await log_payment_error(
+                        conn,
+                        schema_id,
+                        payment_id,
+                        payload if "payload" in locals() else {},
+                        str(e)
+                    )
+
+                    continue
+
+
+
+async def process_pending_upi_payments_by_tenant(
+    db_pool,
+    schema_id
+):
+
+    print("=" * 60)
+    print(f"UPI TO SAP POSTING STARTED FOR {schema_id}")
+    print("=" * 60)
+
+    async with db_pool.acquire() as conn:
+
+        rows = await conn.fetch(
+            f"""
+            SELECT DISTINCT h.payment_id
+            FROM "{schema_id}".ik_inc_payment_header h
+            INNER JOIN "{schema_id}".ik_inc_payment_paymeans_line p
+                ON h.payment_id = p.payment_id
+            WHERE
+                h.status = 'Draft'
+                AND h.sap_status = 'Pending'
+                AND p.upi_status = 'SUCCESS'
+            """
+        )
+
+        config = await get_sap_config_by_schema(
+                    conn,
+                    schema_id
+                )
+
+        for row in rows:
+
+            payment_id = row["payment_id"]
+
+            try:
+
+                print("PROCESSING PAYMENT =", payment_id)
+
+                payload = await SapPaymentService.build_sap_payload_from_db(
+                    conn,
+                    schema_id,
+                    payment_id
+                )
+
+                
+
+                sap_response = await SAPApiClient.post_incoming_payment(
+                    config,
+                    payload
+                )
+
+                await conn.execute(
+                    f"""
+                    UPDATE "{schema_id}".ik_inc_payment_header
+                    SET
+                        status='Close',
+                        sap_status='Posted',
+                        sap_docentry=$1,
+                        sap_docnum=$2,
+                        series_id=$3,
+                        journal_remarks=$4,
+                        updated_at=NOW()
+                    WHERE payment_id=$5
+                    """,
+                    str(sap_response.get("DocEntry")),
+                    str(sap_response.get("DocNum")),
+                    sap_response.get("Series"),
+                    sap_response.get("JournalRemarks"),
+                    payment_id
+                )
+
+                print(
+                    f"PAYMENT POSTED SUCCESSFULLY : {payment_id}"
+                )
+
+            except Exception as e:
+
+                print(
+                    f"PAYMENT FAILED : {payment_id}"
+                )
+
+                await log_payment_error(
+                    conn,
+                    schema_id,
+                    payment_id,
+                    payload if "payload" in locals() else {},
+                    str(e)
+                )
+
+async def log_payment_error(
+    conn,
+    tenant_schema,
+    payment_id,
+    payload,
+    error
+):
+
+    error_id = await generate_error_id(
+        conn,
+        tenant_schema
+    )
+
+    await conn.execute(
+        f"""
+        INSERT INTO "{tenant_schema}".ik_error
+        (
+            error_id,
+            schema_id,
+            type,
+            error_desc,
+            json
+        )
+        VALUES
+        (
+            $1,$2,$3,$4,$5
+        )
+        """,
+        error_id,
+        tenant_schema,
+        "IncomingPaymentSAP",
+        f"Payment ID {payment_id} : {extract_sap_error(error)}",
+        json.dumps(payload, default=str)
+    )
+
+    await conn.execute(
+        f"""
+        UPDATE "{tenant_schema}".ik_inc_payment_header
+        SET
+            sap_status='Failed',
+            updated_at=NOW()
+        WHERE payment_id=$1
+        """,
+        payment_id
+    )
 
 
 # ===================================
@@ -429,7 +681,7 @@ def start_scheduler(db_pool):
     scheduler.add_job(
         sync_sap_data,
         "cron",
-        hour=9,
+        hour=3,
         minute=0,
         args=[db_pool],
         id="sap_sync_job",
@@ -439,4 +691,18 @@ def start_scheduler(db_pool):
         misfire_grace_time=3600
     )
 
+    scheduler.add_job(
+        process_pending_upi_payments,
+        "cron",
+        hour=4,
+        minute=55,
+        args=[db_pool],
+        id="incoming_payment_sap_posting",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=3600
+    )
+
     scheduler.start()
+

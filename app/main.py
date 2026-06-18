@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import os
 import sys
+from app.scheduler.scheduler_router import router as scheduler_router
 
 sys.stdout.reconfigure(encoding="utf-8", errors="ignore")
 sys.stderr.reconfigure(encoding="utf-8", errors="ignore")
@@ -145,6 +146,7 @@ app.include_router(payment_router, prefix="/Opspulseb1/api")
 app.include_router(log_router, prefix="/Opspulseb1/api")
 app.include_router(inventory_router, prefix="/Opspulseb1/api")
 app.include_router(upi_router,prefix="/Opspulseb1/api")
+app.include_router(scheduler_router,prefix="/Opspulseb1/api" )
 
 # ==========================================================
 # HEALTH CHECK
